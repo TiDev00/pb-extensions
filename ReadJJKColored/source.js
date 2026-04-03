@@ -733,11 +733,11 @@ var _Sources = (() => {
   var FALLBACK_IMAGE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk/chapter%201/01_colorized.webp";
   var FALLBACK_BASE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk";
   var ReadJJKColoredInfo = {
-    version: "2.0.0",
+    version: "1.0.0",
     name: "ReadJJKColored",
     icon: "icon.png",
-    author: "YourName",
-    authorWebsite: "https://github.com/YourName",
+    author: "TiDev00",
+    authorWebsite: "https://github.com/TiDev00",
     description: "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
     contentRating: import_types.ContentRating.EVERYONE,
     websiteBaseURL: BASE_URL,
