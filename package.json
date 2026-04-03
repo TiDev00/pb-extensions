@@ -1,11 +1,13 @@
 {
   "name": "pb-extensions",
+  "author": "TiDev00",
+  "license": "MIT",
   "version": "1.0.0",
   "repositoryName": "pb-extensions",
-  "description": "Personal Paperback v0.8 extension repository",
+  "description": "Paperback v0.8 extension repository",
   "scripts": {
+    "prebuild": "node -e \"const fs=require('fs'),path=require('path');try{fs.readdirSync('src').forEach(s=>{const base=path.join('src',s,'includes'),jpg=path.join(base,'icon.jpg'),png=path.join(base,'icon.png');if(fs.existsSync(jpg)&&!fs.existsSync(png)){fs.copyFileSync(jpg,png);fs.unlinkSync(jpg);console.log('[prebuild] converted '+jpg+' -> '+png)}})}catch(e){}\"",
     "build": "paperback bundle",
-    "bundle": "paperback bundle",
     "serve": "paperback serve",
     "lint": "eslint --ext .ts src/",
     "pretest": "npm run build",

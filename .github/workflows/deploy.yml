@@ -1,5 +1,3 @@
-name: CI / Deploy
-
 on:
   push:
     branches:
@@ -68,11 +66,10 @@ jobs:
           path: bundles/
 
       # ── 3. Deploy bundles/ contents to the deployment branch ────
-      - name: Deploy to deployment branch
+      - name: Deploy
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: deployment
           folder: bundles
           target-folder: "."
           clean: true
- 
