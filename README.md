@@ -28,7 +28,7 @@ https://tidev00.github.io/pb-extensions/
 
 ### Prerequisites
 
-- Node.js ≥ 16
+- Node.js ≥ 20
 - npm ≥ 7
 
 ### Getting started
