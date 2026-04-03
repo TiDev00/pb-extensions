@@ -1,0 +1,27 @@
+{
+  "name": "pb-extensions",
+  "version": "1.0.0",
+  "repositoryName": "pb-extensions",
+  "description": "Personal Paperback v0.8 extension repository",
+  "scripts": {
+    "build": "paperback bundle",
+    "bundle": "paperback bundle",
+    "serve": "paperback serve",
+    "lint": "eslint --ext .ts src/",
+    "pretest": "npm run build",
+    "test": "node tests/SourceTester.js",
+    "test:local": "LOCAL_DEV=1 node tests/SourceTester.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@paperback/toolchain": "^0.8.7",
+    "@paperback/types": "^0.8.7",
+    "cheerio": "^1.0.0-rc.12"
+  }
+}

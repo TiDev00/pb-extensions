@@ -1,0 +1,11 @@
+{
+  "name": "ReadJJKColored",
+  "version": "1.0.0",
+  "description": "Paperback extension for readjjkcolored.com — Jujutsu Kaisen colored scans",
+  "paperback": {
+    "name": "ReadJJKColored",
+    "classes": [
+      "ReadJJKColored"
+    ]
+  }
+}

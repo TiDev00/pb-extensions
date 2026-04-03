@@ -1,0 +1,11 @@
+{
+  "name": "MultiMangaTemplate",
+  "version": "1.0.0",
+  "description": "Template for multi-title manga catalogue sites",
+  "paperback": {
+    "name": "MultiMangaTemplate",
+    "classes": [
+      "MultiMangaTemplate"
+    ]
+  }
+}
