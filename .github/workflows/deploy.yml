@@ -1,0 +1,78 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Job 1: Build & Test ──────────────────────────────────────────────────
+  test:
+    name: Build & Test extensions
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node ──────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Build all extensions ────────────────────────────────────────────
+      - name: Build extensions
+        run: npm run build
+
+      # ── 5. Run integration tests for all sources ───────────────────────────
+      - name: Test all sources
+        run: node tests/SourceTester.js
+
+      # ── 6. Upload bundles as artifact so the deploy job can use them ────────
+      - name: Upload bundles artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles
+          path: bundles/
+          retention-days: 1
+
+  # ── Job 2: Deploy (only runs when test job passes) ───────────────────────
+  deploy:
+    name: Deploy to deployment branch
+    runs-on: ubuntu-latest
+    needs: test # blocks deploy if any test fails
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Download built bundles from test job ────────────────────────────
+      - name: Download bundles artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bundles
+          path: bundles/
+
+      # ── 3. Deploy bundles/ contents to the deployment branch ────
+      - name: Deploy to deployment branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: deployment
+          folder: bundles
+          target-folder: "."
+          clean: true
+ 
