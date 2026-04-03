@@ -9,7 +9,7 @@ A [Paperback](https://paperback.moe) extension repository targeting **Paperback 
 Add the following URL as a repository in the Paperback app:
 
 ```
-https://raw.githubusercontent.com/thierno-cisse/pb-extensions/deployment/
+https://tidev00.github.io/pb-extensions/
 ```
 
 > **Steps:** Settings → Extensions → Edit → + → paste the URL above → Done.
