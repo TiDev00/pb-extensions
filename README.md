@@ -9,7 +9,7 @@ A [Paperback](https://paperback.moe) extension repository targeting **Paperback 
 Add the following URL as a repository in the Paperback app:
 
 ```
-https://tidev00.github.io/pb-extensions/
+https://raw.githubusercontent.com/thierno-cisse/pb-extensions/deployment/
 ```
 
 > **Steps:** Settings → Extensions → Edit → + → paste the URL above → Done.
@@ -42,8 +42,18 @@ npm install
 ### Build & test locally
 
 ```bash
-npm run build       # compile all extensions
-npm run serve       # serve the repo locally (default: port 8080)
+npm run build                        # compile all extensions
+npm test                             # build then run integration tests for all sources
+npm test -- ReadJJKColored           # build then test a single source
+npm run serve                        # serve the repo locally (default: port 8080)
+```
+
+`npm test` runs `tests/SourceTester.js`, a live integration test runner that hits the real website and verifies `getHomePageSections`, `getMangaDetails`, `getChapters`, `getChapterDetails`, and `getSearchResults` for every source in `src/`.
+
+For local development behind a corporate SSL-inspection proxy, prefix with `LOCAL_DEV=1`:
+
+```bash
+LOCAL_DEV=1 npm test
 ```
 
 Point the Paperback app at `http://<your-local-ip>:8080` to test against a local build.
