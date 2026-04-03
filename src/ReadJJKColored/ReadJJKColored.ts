@@ -58,11 +58,11 @@ interface SiteConfig {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const ReadJJKColoredInfo: SourceInfo = {
-  version: "2.0.0",
+  version: "1.0.0",
   name: "ReadJJKColored",
   icon: "icon.png",
-  author: "YourName",
-  authorWebsite: "https://github.com/YourName",
+  author: "TiDev00",
+  authorWebsite: "https://github.com/TiDev00",
   description:
     "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
   contentRating: ContentRating.EVERYONE,
