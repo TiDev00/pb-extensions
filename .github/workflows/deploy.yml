@@ -42,7 +42,7 @@ jobs:
 
       # ── 5. Run integration tests for all sources ───────────────────────────
       - name: Test all sources
-        run: node tests/SourceTester.js
+        run: pnpm run test:unit && node tests/SourceTester.js
 
       # ── 6. Upload bundles as artifact so the deploy job can use them ────────
       - name: Upload bundles artifact
