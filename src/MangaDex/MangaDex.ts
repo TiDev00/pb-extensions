@@ -1,4 +1,5 @@
 import {
+  Request,
   BadgeColor,
   Chapter,
   ChapterDetails,
@@ -14,9 +15,11 @@ import {
 } from "@paperback/types";
 
 import {
+  createCloudflareBypassRequest,
   createGetRequest,
   createSourceRequestManager,
   getPageNumber,
+  throwIfCloudflareBlocked,
 } from "../shared";
 import {
   MangaDexAtHomeResponse,
@@ -65,7 +68,10 @@ export const MangaDexInfo: SourceInfo = {
     { text: "English", type: BadgeColor.GREY },
     { text: "API", type: BadgeColor.BLUE },
   ],
-  intents: SourceIntents.MANGA_CHAPTERS | SourceIntents.HOMEPAGE_SECTIONS,
+  intents:
+    SourceIntents.MANGA_CHAPTERS |
+    SourceIntents.HOMEPAGE_SECTIONS |
+    SourceIntents.CLOUDFLARE_BYPASS_REQUIRED,
 };
 
 export class MangaDex extends Source {
@@ -75,6 +81,10 @@ export class MangaDex extends Source {
   readonly requestManager = createSourceRequestManager(WEBSITE_BASE_URL, {
     Accept: "application/vnd.api+json, application/json",
   });
+
+  async getCloudflareBypassRequestAsync(): Promise<Request> {
+    return createCloudflareBypassRequest(this.baseUrl);
+  }
 
   async getMangaDetails(mangaId: string): Promise<SourceManga> {
     this.assertUuid(mangaId, "manga");
@@ -255,6 +265,8 @@ export class MangaDex extends Source {
       createGetRequest(url),
       1,
     );
+
+    throwIfCloudflareBlocked(response.status);
 
     if (response.status >= 400) {
       // Include the full URL and a snippet of the response body to aid debugging.
