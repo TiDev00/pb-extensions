@@ -33,7 +33,8 @@ jobs:
 
       # ── 3. Install dependencies ────────────────────────────────────────────
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # Allow install when pnpm-lock.yaml is not present in the repo.
+        run: pnpm install --no-frozen-lockfile
 
       # ── 4. Build all extensions ────────────────────────────────────────────
       - name: Build extensions
