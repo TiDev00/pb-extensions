@@ -98,8 +98,15 @@ export class MangaDex extends Source {
   async getChapters(mangaId: string): Promise<Chapter[]> {
     this.assertUuid(mangaId, "manga");
 
-    const chapters = await this.fetchAllChapters(mangaId);
-    return this.parser.parseChapterList(chapters);
+    const preferredChapters = this.parser.parseChapterList(
+      await this.fetchAllChapters(mangaId, [SUPPORTED_LANGUAGE]),
+    );
+
+    if (preferredChapters.length > 0) {
+      return preferredChapters;
+    }
+
+    return this.parser.parseChapterList(await this.fetchAllChapters(mangaId));
   }
 
   async getChapterDetails(
@@ -234,7 +241,10 @@ export class MangaDex extends Source {
     };
   }
 
-  private async fetchAllChapters(mangaId: string): Promise<MangaDexChapter[]> {
+  private async fetchAllChapters(
+    mangaId: string,
+    translatedLanguages: string[] = [SUPPORTED_LANGUAGE],
+  ): Promise<MangaDexChapter[]> {
     const chapters: MangaDexChapter[] = [];
     let offset = 0;
     let requestCount = 0;
@@ -250,7 +260,9 @@ export class MangaDex extends Source {
         "contentRating[]": DEFAULT_CONTENT_RATINGS,
         "order[chapter]": "desc",
         "order[volume]": "desc",
-        "translatedLanguage[]": SUPPORTED_LANGUAGE,
+        ...(translatedLanguages.length > 0
+          ? { "translatedLanguage[]": translatedLanguages }
+          : {}),
       });
 
       chapters.push(...response.data);
