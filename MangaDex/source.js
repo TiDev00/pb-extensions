@@ -972,7 +972,7 @@ var _Sources = (() => {
     }
     async getMangaDetails(mangaId) {
       this.assertUuid(mangaId, "manga");
-      const response = await this.fetchJson(`/manga/${mangaId}`, this.createMangaQuery());
+      const response = await this.fetchJson(`/manga/${mangaId}`, this.createMangaDetailsQuery());
       return this.parser.parseMangaDetails(response.data);
     }
     async getChapters(mangaId) {
@@ -996,34 +996,38 @@ var _Sources = (() => {
       return this.parser.parseChapterDetails(mangaId, chapterId, response);
     }
     async getHomePageSections(sectionCallback) {
-      const sectionEntries = Object.entries(HOME_SECTION_CONFIGS);
-      for (const [id, config] of sectionEntries) {
-        sectionCallback(
-          App.createHomeSection({
-            id,
-            title: config.title,
-            type: import_types.HomeSectionType.singleRowNormal,
-            containsMoreItems: true
-          })
-        );
-      }
-      await Promise.all(
-        sectionEntries.map(async ([id, config]) => {
-          try {
-            const response = await this.fetchMangaSection(id, 1);
-            sectionCallback(
-              App.createHomeSection({
-                id,
-                title: config.title,
-                type: import_types.HomeSectionType.singleRowNormal,
-                containsMoreItems: true,
-                items: this.parser.parseMangaTiles(response.data)
-              })
-            );
-          } catch {
-          }
+      const sections = Object.entries(HOME_SECTION_CONFIGS).map(([id, config]) => ({
+        id,
+        title: config.title,
+        section: App.createHomeSection({
+          id,
+          title: config.title,
+          type: import_types.HomeSectionType.singleRowNormal,
+          containsMoreItems: true
         })
+      }));
+      sections.forEach(({ section }) => sectionCallback(section));
+      const loadResults = await Promise.all(
+        sections.map(
+          async ({ id, title, section }) => {
+            try {
+              const response = await this.fetchMangaSection(id, 1);
+              section.items = this.parser.parseMangaTiles(response.data);
+              sectionCallback(section);
+              return { loaded: true };
+            } catch (error) {
+              return {
+                error: createSectionLoadError(error, title),
+                loaded: false
+              };
+            }
+          }
+        )
       );
+      const firstError = loadResults.find((result) => result.error)?.error;
+      if (!loadResults.some((result) => result.loaded) && firstError) {
+        throw firstError;
+      }
     }
     async getViewMoreItems(homepageSectionId, metadata) {
       const page = getPageNumber(metadata);
@@ -1043,7 +1047,7 @@ var _Sources = (() => {
       const page = getPageNumber(metadata);
       const query = searchQuery.title?.trim();
       const response = await this.fetchJson("/manga", {
-        ...this.createMangaQuery(page),
+        ...this.createMangaListQuery(page),
         ...query ? { title: query } : { "order[followedCount]": "desc" }
       });
       return App.createPagedResults({
@@ -1068,10 +1072,16 @@ var _Sources = (() => {
       }
       return url.toString();
     }
-    createMangaQuery(page = 1) {
+    createMangaDetailsQuery() {
+      return {
+        "includes[]": ["cover_art", "author", "artist"]
+      };
+    }
+    createMangaListQuery(page = 1) {
       return {
         limit: MANGA_PAGE_SIZE,
         offset: (page - 1) * MANGA_PAGE_SIZE,
+        hasAvailableChapters: true,
         "availableTranslatedLanguage[]": SUPPORTED_LANGUAGE,
         "contentRating[]": DEFAULT_CONTENT_RATINGS,
         "includes[]": ["cover_art", "author", "artist"]
@@ -1112,18 +1122,11 @@ var _Sources = (() => {
           `MangaDex API request failed with status ${response.status} for ${path} \u2014 ${url} \u2014 ${snippet}`
         );
       }
-      try {
-        return JSON.parse(response.data);
-      } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Failed to parse MangaDex API response for ${path}: ${reason}`
-        );
-      }
+      return parseMangaDexResponseData(response.data, path);
     }
     fetchMangaSection(sectionId, page) {
       return this.fetchJson("/manga", {
-        ...this.createMangaQuery(page),
+        ...this.createMangaListQuery(page),
         [`order[${HOME_SECTION_CONFIGS[sectionId].order}]`]: "desc"
       });
     }
@@ -1133,6 +1136,34 @@ var _Sources = (() => {
       }
     }
   };
+  function createSectionLoadError(error, title) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return new Error(`Failed to load MangaDex section "${title}": ${reason}`);
+  }
+  function parseMangaDexResponseData(data, path) {
+    if (typeof data === "string") {
+      try {
+        return JSON.parse(data);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Failed to parse MangaDex API response for ${path}: ${reason}`
+        );
+      }
+    }
+    if (isMangaDexResponseShape(data)) {
+      return data;
+    }
+    throw new Error(
+      `Unexpected MangaDex API response type for ${path}: ${typeof data}`
+    );
+  }
+  function isMangaDexResponseShape(value) {
+    if (!value || typeof value !== "object") {
+      return false;
+    }
+    return "data" in value || "baseUrl" in value && "chapter" in value;
+  }
   return __toCommonJS(MangaDex_exports);
 })();
 this.Sources = _Sources; if (typeof exports === 'object' && typeof module !== 'undefined') {module.exports.Sources = this.Sources;}
