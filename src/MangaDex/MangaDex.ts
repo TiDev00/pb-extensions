@@ -106,7 +106,9 @@ export class MangaDex extends Source {
       return preferredChapters;
     }
 
-    return this.parser.parseChapterList(await this.fetchAllChapters(mangaId));
+    return this.parser.parseChapterList(
+      await this.fetchAllChapters(mangaId, []),
+    );
   }
 
   async getChapterDetails(
@@ -243,7 +245,7 @@ export class MangaDex extends Source {
 
   private async fetchAllChapters(
     mangaId: string,
-    translatedLanguages: string[] = [SUPPORTED_LANGUAGE],
+    translatedLanguages: string[],
   ): Promise<MangaDexChapter[]> {
     const chapters: MangaDexChapter[] = [];
     let offset = 0;
