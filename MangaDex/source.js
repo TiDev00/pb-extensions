@@ -732,6 +732,7 @@ var _Sources = (() => {
   var DEFAULT_REQUESTS_PER_SECOND = 4;
   var DEFAULT_REQUEST_TIMEOUT = 2e4;
   var MOBILE_USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1";
+  var CLOUDFLARE_BYPASS_MESSAGE = 'CLOUDFLARE BYPASS ERROR:\nGo to Source settings and tap "Cloudflare Bypass".';
   function createSourceRequestManager(baseUrl, extraHeaders = {}) {
     return App.createRequestManager({
       requestsPerSecond: DEFAULT_REQUESTS_PER_SECOND,
@@ -752,6 +753,14 @@ var _Sources = (() => {
   }
   function createGetRequest(url) {
     return App.createRequest({ url, method: "GET" });
+  }
+  function createCloudflareBypassRequest(baseUrl) {
+    return createGetRequest(baseUrl);
+  }
+  function throwIfCloudflareBlocked(status) {
+    if (status === 403 || status === 503) {
+      throw new Error(CLOUDFLARE_BYPASS_MESSAGE);
+    }
   }
   function getPageNumber(metadata) {
     return metadata?.page ?? 1;
@@ -946,7 +955,7 @@ var _Sources = (() => {
       { text: "English", type: import_types.BadgeColor.GREY },
       { text: "API", type: import_types.BadgeColor.BLUE }
     ],
-    intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS
+    intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS | import_types.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
   };
   var MangaDex = class extends import_types.Source {
     constructor() {
@@ -957,6 +966,9 @@ var _Sources = (() => {
       this.requestManager = createSourceRequestManager(WEBSITE_BASE_URL, {
         Accept: "application/vnd.api+json, application/json"
       });
+    }
+    async getCloudflareBypassRequestAsync() {
+      return createCloudflareBypassRequest(this.baseUrl);
     }
     async getMangaDetails(mangaId) {
       this.assertUuid(mangaId, "manga");
@@ -1076,6 +1088,7 @@ var _Sources = (() => {
         createGetRequest(url),
         1
       );
+      throwIfCloudflareBlocked(response.status);
       if (response.status >= 400) {
         const snippet = String(response.data ?? "").slice(0, 300).replace(/\n/g, " ");
         throw new Error(
