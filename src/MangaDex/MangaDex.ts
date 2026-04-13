@@ -118,31 +118,39 @@ export class MangaDex extends Source {
   async getHomePageSections(
     sectionCallback: (section: HomeSection) => void,
   ): Promise<void> {
-    const sectionEntries = (
-      Object.entries(HOME_SECTION_CONFIGS) as Array<
-        [HomeSectionId, (typeof HOME_SECTION_CONFIGS)[HomeSectionId]]
-      >
-    ).map(([id, config]) =>
-      App.createHomeSection({
-        id,
-        title: config.title,
-        type: HomeSectionType.singleRowNormal,
-        containsMoreItems: true,
+    const sectionEntries = Object.entries(HOME_SECTION_CONFIGS) as Array<
+      [HomeSectionId, (typeof HOME_SECTION_CONFIGS)[HomeSectionId]]
+    >;
+
+    for (const [id, config] of sectionEntries) {
+      sectionCallback(
+        App.createHomeSection({
+          id,
+          title: config.title,
+          type: HomeSectionType.singleRowNormal,
+          containsMoreItems: true,
+        }),
+      );
+    }
+
+    await Promise.all(
+      sectionEntries.map(async ([id, config]) => {
+        try {
+          const response = await this.fetchMangaSection(id, 1);
+          sectionCallback(
+            App.createHomeSection({
+              id,
+              title: config.title,
+              type: HomeSectionType.singleRowNormal,
+              containsMoreItems: true,
+              items: this.parser.parseMangaTiles(response.data),
+            }),
+          );
+        } catch {
+          // Keep the shell section visible even if this specific request fails.
+        }
       }),
     );
-
-    sectionEntries.forEach(sectionCallback);
-
-    const results = await Promise.all(
-      sectionEntries.map((section) =>
-        this.fetchMangaSection(section.id as HomeSectionId, 1),
-      ),
-    );
-
-    sectionEntries.forEach((section, index) => {
-      section.items = this.parser.parseMangaTiles(results[index]?.data ?? []);
-      sectionCallback(section);
-    });
   }
 
   async getViewMoreItems(
