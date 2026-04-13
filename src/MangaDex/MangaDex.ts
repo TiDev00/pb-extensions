@@ -35,7 +35,7 @@ const MAX_CHAPTER_PAGE_REQUESTS = 100;
 const DEFAULT_CONTENT_RATINGS = [
   "safe",
   "suggestive",
-  "erotica",
+  "erotic",
   "pornographic",
 ];
 const SUPPORTED_LANGUAGE = "en";

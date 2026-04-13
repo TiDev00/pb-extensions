@@ -69,7 +69,6 @@ export const ReadJJKColoredInfo: SourceInfo = {
   name: "ReadJJKColored",
   icon: "icon.png",
   author: "TiDev00",
-  authorWebsite: "https://github.com/TiDev00",
   description:
     "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
   contentRating: ContentRating.EVERYONE,
