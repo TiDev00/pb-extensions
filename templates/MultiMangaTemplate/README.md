@@ -14,16 +14,23 @@ A template for building Paperback v0.8 extensions that target sites with **a ful
 
 For single-series sites, use `SingleMangaTemplate` instead.
 
+This template folder is a copy-ready starter, not part of the root TypeScript build. It becomes a live source only after you copy it into `src/` and rename the files to match the new source folder.
+
+Maintenance notes:
+
+- The inline request helpers in `MultiMangaTemplate.ts` intentionally mirror `src/shared.ts` so copied sources stay standalone. If you improve one, update the other.
+- `parseChapterList()` no longer receives a `mangaId` argument because the template implementation never used it.
+
 ---
 
 ## Files
 
-| File                          | Purpose                                            |
-| ----------------------------- | -------------------------------------------------- |
-| `MultiMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface  |
-| `MultiMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic          |
-| `package.json`                | Per-source manifest (name, version, classes array) |
-| `includes/icon.png`           | 512×512 PNG icon _(must be added)_                 |
+| File                          | Purpose                                                             |
+| ----------------------------- | ------------------------------------------------------------------- |
+| `MultiMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface                   |
+| `MultiMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic                           |
+| `package.json`                | Local manifest for workspace metadata and copy-time source metadata |
+| `includes/icon.png`           | 512×512 PNG icon _(must be added)_                                  |
 
 ---
 
@@ -51,7 +58,7 @@ mv src/MyNewSource/MultiMangaTemplateParser.ts  src/MyNewSource/MyNewSourceParse
 - [ ] Update `hasNextPage()` if the site uses a different pagination pattern
 - [ ] Set `longStrip: true` in `parseChapterDetails()` for webtoon/vertical-scroll sites
 - [ ] Add `includes/icon.png` (512×512 PNG)
-- [ ] Build: `npm run build`
+- [ ] Build: `pnpm run build`
 
 ---
 
@@ -90,4 +97,3 @@ mv src/MyNewSource/MultiMangaTemplateParser.ts  src/MyNewSource/MyNewSourceParse
 | Grid cover             | `div.c-image-hover img[data-src]`    |
 | Grid title             | `div.post-title h3 a`                |
 | Latest chapter on tile | `span.chapter`                       |
- 

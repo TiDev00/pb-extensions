@@ -10,16 +10,23 @@ A template for building Paperback v0.8 extensions that target sites dedicated to
 
 For multi-title catalogue sites, use `MultiMangaTemplate` instead.
 
+This template folder is a copy-ready starter, not part of the root TypeScript build. It becomes a live source only after you copy it into `src/` and rename the files to match the new source folder.
+
+Maintenance notes:
+
+- The inline request helpers in `SingleMangaTemplate.ts` intentionally mirror `src/shared.ts` so copied sources stay standalone. If you improve one, update the other.
+- `parseChapterList()` no longer receives a `mangaId` argument because the template implementation never used it.
+
 ---
 
 ## Files
 
-| File                           | Purpose                                            |
-| ------------------------------ | -------------------------------------------------- |
-| `SingleMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface  |
-| `SingleMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic          |
-| `package.json`                 | Per-source manifest (name, version, classes array) |
-| `includes/icon.png`            | 512×512 PNG icon *(must be added)*                 |
+| File                           | Purpose                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `SingleMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface                   |
+| `SingleMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic                           |
+| `package.json`                 | Local manifest for workspace metadata and copy-time source metadata |
+| `includes/icon.png`            | 512×512 PNG icon _(must be added)_                                  |
 
 ---
 
@@ -45,7 +52,7 @@ mv src/MyNewSource/SingleMangaTemplateParser.ts  src/MyNewSource/MyNewSourcePars
 - [ ] Update selectors in `*Parser.ts` — start with `parseMangaDetails` and `parseChapterList`
 - [ ] Update the search keywords in `getSearchResults()` to match the title
 - [ ] Add `includes/icon.png` (512×512 PNG)
-- [ ] Build: `npm run build`
+- [ ] Build: `pnpm run build`
 
 ---
 

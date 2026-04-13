@@ -95,7 +95,7 @@ export class SingleMangaTemplateParser {
   }
 
   /** Called by getChapters(). */
-  parseChapterList($: CheerioAPI, mangaId: string): Chapter[] {
+  parseChapterList($: CheerioAPI): Chapter[] {
     const chapters: Chapter[] = [];
 
     // WordPress Madara:  li.wp-manga-chapter

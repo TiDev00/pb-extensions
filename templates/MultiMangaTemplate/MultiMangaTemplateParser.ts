@@ -102,7 +102,7 @@ export class MultiMangaTemplateParser {
   }
 
   /** Called by getChapters(). */
-  parseChapterList($: CheerioAPI, mangaId: string): Chapter[] {
+  parseChapterList($: CheerioAPI): Chapter[] {
     const chapters: Chapter[] = [];
 
     const rows = $(
@@ -210,35 +210,35 @@ export class MultiMangaTemplateParser {
   // Home section parsers
 
   parseLatestUpdates($: CheerioAPI): PartialSourceManga[] {
-    return this._parseTileList(
+    return this.parseTileList(
       $,
       "div.page-item-detail, div.last-update .manga-poster",
     );
   }
 
   parsePopular($: CheerioAPI): PartialSourceManga[] {
-    return this._parseTileList(
+    return this.parseTileList(
       $,
       "div.popular-list .manga-poster, div.top-manga .item",
     );
   }
 
   parseNewManga($: CheerioAPI): PartialSourceManga[] {
-    return this._parseTileList(
+    return this.parseTileList(
       $,
       "div.new-manga .manga-poster, div.new-titles .item",
     );
   }
 
   parseMangaGrid($: CheerioAPI): PartialSourceManga[] {
-    return this._parseTileList(
+    return this.parseTileList(
       $,
       "div.manga-poster, div.c-image-hover, div.page-item-detail",
     );
   }
 
   parseSearchResults($: CheerioAPI): PartialSourceManga[] {
-    return this._parseTileList(
+    return this.parseTileList(
       $,
       "div.c-tabs-item__content, div.tab-summary, div.manga-poster",
     );
@@ -252,10 +252,7 @@ export class MultiMangaTemplateParser {
   }
 
   /** Parses manga tiles from a CSS selector. Used by all home/search parsers. */
-  private _parseTileList(
-    $: CheerioAPI,
-    selector: string,
-  ): PartialSourceManga[] {
+  private parseTileList($: CheerioAPI, selector: string): PartialSourceManga[] {
     const tiles: PartialSourceManga[] = [];
 
     $(selector).each((_i, el) => {

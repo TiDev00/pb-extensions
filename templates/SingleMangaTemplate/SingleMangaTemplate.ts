@@ -34,6 +34,8 @@ import { SingleMangaTemplateParser } from "./SingleMangaTemplateParser";
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const TEMPLATE_BASE_URL = "https://TEMPLATE_DOMAIN.com";
+const MOBILE_USER_AGENT =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1";
 
 /**
  * The URL path to the single manga's detail page.
@@ -41,6 +43,42 @@ const TEMPLATE_BASE_URL = "https://TEMPLATE_DOMAIN.com";
  * then set this to 'manga/my-title'
  */
 const MANGA_ID_SLUG = "manga/TEMPLATE_MANGA_SLUG";
+
+// Keep this helper block in sync with src/shared.ts.
+// Templates stay self-contained so copied sources do not depend on repo-only modules.
+function createSourceRequestManager(baseUrl: string) {
+  return App.createRequestManager({
+    requestsPerSecond: 4,
+    requestTimeout: 20_000,
+    interceptor: {
+      interceptRequest: async (request: Request): Promise<Request> => ({
+        ...request,
+        headers: {
+          ...(request.headers ?? {}),
+          "user-agent": MOBILE_USER_AGENT,
+          referer: baseUrl,
+        },
+      }),
+      interceptResponse: async (response) => response,
+    },
+  });
+}
+
+function createGetRequest(url: string): Request {
+  return App.createRequest({ url, method: "GET" });
+}
+
+function createCloudflareBypassRequest(baseUrl: string): Request {
+  return createGetRequest(baseUrl);
+}
+
+function throwIfCloudflareBlocked(status: number): void {
+  if (status === 403 || status === 503) {
+    throw new Error(
+      'CLOUDFLARE BYPASS ERROR:\nGo to Source settings and tap "Cloudflare Bypass".',
+    );
+  }
+}
 
 // ── Source metadata ──────────────────────────────────────────────────────────
 
@@ -66,60 +104,30 @@ export class TEMPLATE_NAME extends Source {
   readonly parser = new SingleMangaTemplateParser();
   readonly baseUrl = TEMPLATE_BASE_URL;
   readonly mangaIdSlug = MANGA_ID_SLUG;
-
-  readonly requestManager = App.createRequestManager({
-    requestsPerSecond: 4,
-    requestTimeout: 20_000,
-    interceptor: {
-      interceptRequest: async (request: Request): Promise<Request> => {
-        request.headers = {
-          ...(request.headers ?? {}),
-          "user-agent":
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1",
-          referer: this.baseUrl,
-        };
-        return request;
-      },
-      interceptResponse: async (response) => response,
-    },
-  });
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  private buildRequest(url: string): Request {
-    return App.createRequest({ url, method: "GET" });
-  }
-
-  private guardCloudFlare(status: number): void {
-    if (status === 403 || status === 503) {
-      throw new Error(
-        'CLOUDFLARE BYPASS ERROR:\nGo to Source settings and tap "Cloudflare Bypass".',
-      );
-    }
-  }
+  readonly requestManager = createSourceRequestManager(TEMPLATE_BASE_URL);
 
   async getCloudflareBypassRequestAsync(): Promise<Request> {
-    return App.createRequest({ url: this.baseUrl, method: "GET" });
+    return createCloudflareBypassRequest(this.baseUrl);
   }
 
   async getMangaDetails(_mangaId: string): Promise<SourceManga> {
     const response = await this.requestManager.schedule(
-      this.buildRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
+      createGetRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     const $ = this.cheerio.load(response.data as string);
     return this.parser.parseMangaDetails($, this.mangaIdSlug);
   }
 
   async getChapters(_mangaId: string): Promise<Chapter[]> {
     const response = await this.requestManager.schedule(
-      this.buildRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
+      createGetRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     const $ = this.cheerio.load(response.data as string);
-    return this.parser.parseChapterList($, this.mangaIdSlug);
+    return this.parser.parseChapterList($);
   }
 
   async getChapterDetails(
@@ -127,10 +135,10 @@ export class TEMPLATE_NAME extends Source {
     chapterId: string,
   ): Promise<ChapterDetails> {
     const response = await this.requestManager.schedule(
-      this.buildRequest(`${this.baseUrl}/${chapterId}`),
+      createGetRequest(`${this.baseUrl}/${chapterId}`),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     const $ = this.cheerio.load(response.data as string);
     return this.parser.parseChapterDetails($, mangaId, chapterId);
   }
@@ -150,10 +158,10 @@ export class TEMPLATE_NAME extends Source {
     sectionCallback(section);
 
     const response = await this.requestManager.schedule(
-      this.buildRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
+      createGetRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     const $ = this.cheerio.load(response.data as string);
 
     section.items = [this.parser.parseMangaTile($, this.mangaIdSlug)];
@@ -177,10 +185,10 @@ export class TEMPLATE_NAME extends Source {
     }
 
     const response = await this.requestManager.schedule(
-      this.buildRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
+      createGetRequest(`${this.baseUrl}/${this.mangaIdSlug}`),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     const $ = this.cheerio.load(response.data as string);
 
     return App.createPagedResults({

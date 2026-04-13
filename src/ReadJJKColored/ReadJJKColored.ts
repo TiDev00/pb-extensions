@@ -14,6 +14,13 @@ import {
   SourceManga,
 } from "@paperback/types";
 
+import {
+  createCloudflareBypassRequest,
+  createGetRequest,
+  createSourceRequestManager,
+  throwIfCloudflareBlocked,
+} from "../shared";
+
 const BASE_URL = "https://readjjkcolored.com";
 const CONFIG_URL = `${BASE_URL}/config.js`;
 const MANGA_ID = "jjk-colored";
@@ -83,43 +90,13 @@ export const ReadJJKColoredInfo: SourceInfo = {
 
 export class ReadJJKColored extends Source {
   readonly baseUrl = BASE_URL;
-
-  readonly requestManager = App.createRequestManager({
-    requestsPerSecond: 4,
-    requestTimeout: 20_000,
-    interceptor: {
-      interceptRequest: async (request: Request): Promise<Request> => {
-        request.headers = {
-          ...(request.headers ?? {}),
-          "user-agent":
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1",
-          referer: this.baseUrl,
-        };
-        return request;
-      },
-      interceptResponse: async (response) => response,
-    },
-  });
+  readonly requestManager = createSourceRequestManager(BASE_URL);
 
   /** In-memory cache — avoids re-fetching config.js on every method call */
   private _config: SiteConfig | null = null;
 
-  // ── HTTP helpers ──────────────────────────────────────────────────────────
-
-  private buildRequest(url: string): Request {
-    return App.createRequest({ url, method: "GET" });
-  }
-
-  private guardCloudFlare(status: number): void {
-    if (status === 403 || status === 503) {
-      throw new Error(
-        'CLOUDFLARE BYPASS ERROR:\nGo to Source settings and tap "Cloudflare Bypass".',
-      );
-    }
-  }
-
   async getCloudflareBypassRequestAsync(): Promise<Request> {
-    return App.createRequest({ url: this.baseUrl, method: "GET" });
+    return createCloudflareBypassRequest(this.baseUrl);
   }
 
   // ── Config loader ─────────────────────────────────────────────────────────
@@ -127,10 +104,10 @@ export class ReadJJKColored extends Source {
   private async loadConfig(): Promise<SiteConfig> {
     if (this._config) return this._config;
     const response = await this.requestManager.schedule(
-      this.buildRequest(CONFIG_URL),
+      createGetRequest(CONFIG_URL),
       1,
     );
-    this.guardCloudFlare(response.status);
+    throwIfCloudflareBlocked(response.status);
     this._config = parseConfigJs(response.data as string);
     return this._config;
   }
@@ -371,6 +348,9 @@ function encodeFolder(folder: string): string {
 
 /** Extracts the string value of a JS object key (handles single/double quotes) */
 function extractStr(src: string, key: string): string | undefined {
-  const re = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"'\\r\\n]+)["']`);
+  const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+    `["']?${escapedKey}["']?\\s*:\\s*["']([^"'\\r\\n]+)["']`,
+  );
   return src.match(re)?.[1]?.trim();
 }

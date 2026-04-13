@@ -3,6 +3,7 @@
   "author": "TiDev00",
   "license": "MIT",
   "version": "1.0.0",
+  "packageManager": "pnpm@8.8.0",
   "repositoryName": "pb-extensions",
   "description": "Paperback v0.8 extension repository",
   "scripts": {
@@ -10,7 +11,7 @@
     "build": "paperback bundle",
     "serve": "paperback serve",
     "lint": "eslint --ext .ts src/",
-    "pretest": "npm run build",
+    "pretest": "pnpm run build",
     "test": "node tests/SourceTester.js",
     "test:local": "LOCAL_DEV=1 node tests/SourceTester.js"
   },

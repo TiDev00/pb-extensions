@@ -1,0 +1,11 @@
+{
+  "name": "MangaDex",
+  "version": "1.0.0",
+  "description": "MangaDex.org source for Paperback v0.8",
+  "paperback": {
+    "name": "MangaDex",
+    "classes": [
+      "MangaDex"
+    ]
+  }
+}

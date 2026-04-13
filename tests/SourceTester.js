@@ -4,8 +4,8 @@
 // Usage:
 //   node tests/SourceTester.js                  → test all sources in src/
 //   node tests/SourceTester.js ReadJJKColored   → test one source
-//   npm test                                    → build then test all
-//   npm test -- ReadJJKColored                  → build then test one
+//   pnpm test                                    → build then test all
+//   pnpm test -- ReadJJKColored                  → build then test one
 //
 // Node 18+ required (uses built-in fetch).
 //
@@ -110,7 +110,7 @@ async function testSource(sourceName) {
 
   if (!fs.existsSync(bundlePath)) {
     console.log(C.red(`  Bundle not found: ${bundlePath}`));
-    console.log(C.yellow(`  Run ${C.bold("npm run build")} first.`));
+    console.log(C.yellow(`  Run ${C.bold("pnpm run build")} first.`));
     return { passed: 0, failed: 1 };
   }
 
