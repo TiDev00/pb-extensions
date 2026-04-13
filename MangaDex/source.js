@@ -977,8 +977,15 @@ var _Sources = (() => {
     }
     async getChapters(mangaId) {
       this.assertUuid(mangaId, "manga");
-      const chapters = await this.fetchAllChapters(mangaId);
-      return this.parser.parseChapterList(chapters);
+      const preferredChapters = this.parser.parseChapterList(
+        await this.fetchAllChapters(mangaId, [SUPPORTED_LANGUAGE])
+      );
+      if (preferredChapters.length > 0) {
+        return preferredChapters;
+      }
+      return this.parser.parseChapterList(
+        await this.fetchAllChapters(mangaId, [])
+      );
     }
     async getChapterDetails(mangaId, chapterId) {
       this.assertUuid(mangaId, "manga");
@@ -989,24 +996,34 @@ var _Sources = (() => {
       return this.parser.parseChapterDetails(mangaId, chapterId, response);
     }
     async getHomePageSections(sectionCallback) {
-      const sectionEntries = Object.entries(HOME_SECTION_CONFIGS).map(
-        ([id, config]) => App.createHomeSection({
-          id,
-          title: config.title,
-          type: import_types.HomeSectionType.singleRowNormal,
-          containsMoreItems: true
+      const sectionEntries = Object.entries(HOME_SECTION_CONFIGS);
+      for (const [id, config] of sectionEntries) {
+        sectionCallback(
+          App.createHomeSection({
+            id,
+            title: config.title,
+            type: import_types.HomeSectionType.singleRowNormal,
+            containsMoreItems: true
+          })
+        );
+      }
+      await Promise.all(
+        sectionEntries.map(async ([id, config]) => {
+          try {
+            const response = await this.fetchMangaSection(id, 1);
+            sectionCallback(
+              App.createHomeSection({
+                id,
+                title: config.title,
+                type: import_types.HomeSectionType.singleRowNormal,
+                containsMoreItems: true,
+                items: this.parser.parseMangaTiles(response.data)
+              })
+            );
+          } catch {
+          }
         })
       );
-      sectionEntries.forEach(sectionCallback);
-      const results = await Promise.all(
-        sectionEntries.map(
-          (section) => this.fetchMangaSection(section.id, 1)
-        )
-      );
-      sectionEntries.forEach((section, index) => {
-        section.items = this.parser.parseMangaTiles(results[index]?.data ?? []);
-        sectionCallback(section);
-      });
     }
     async getViewMoreItems(homepageSectionId, metadata) {
       const page = getPageNumber(metadata);
@@ -1060,7 +1077,7 @@ var _Sources = (() => {
         "includes[]": ["cover_art", "author", "artist"]
       };
     }
-    async fetchAllChapters(mangaId) {
+    async fetchAllChapters(mangaId, translatedLanguages) {
       const chapters = [];
       let offset = 0;
       let requestCount = 0;
@@ -1072,7 +1089,7 @@ var _Sources = (() => {
           "contentRating[]": DEFAULT_CONTENT_RATINGS,
           "order[chapter]": "desc",
           "order[volume]": "desc",
-          "translatedLanguage[]": SUPPORTED_LANGUAGE
+          ...translatedLanguages.length > 0 ? { "translatedLanguage[]": translatedLanguages } : {}
         });
         chapters.push(...response.data);
         offset += response.data.length;
