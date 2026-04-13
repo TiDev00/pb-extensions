@@ -20,17 +20,17 @@ Maintenance notes:
 
 - The inline request helpers in `MultiMangaTemplate.ts` intentionally mirror `src/shared.ts` so copied sources stay standalone. If you improve one, update the other.
 - `parseChapterList()` no longer receives a `mangaId` argument because the template implementation never used it.
+- The authoritative metadata lives in the exported `SourceInfo` object inside `MultiMangaTemplate.ts`.
 
 ---
 
 ## Files
 
-| File                          | Purpose                                                             |
-| ----------------------------- | ------------------------------------------------------------------- |
-| `MultiMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface                   |
-| `MultiMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic                           |
-| `package.json`                | Local manifest for workspace metadata and copy-time source metadata |
-| `includes/icon.png`           | 512×512 PNG icon _(must be added)_                                  |
+| File                          | Purpose                                           |
+| ----------------------------- | ------------------------------------------------- |
+| `MultiMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface |
+| `MultiMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic         |
+| `includes/icon.png`           | 512×512 PNG icon _(must be added)_                |
 
 ---
 
@@ -51,7 +51,7 @@ mv src/MyNewSource/MultiMangaTemplateParser.ts  src/MyNewSource/MyNewSourceParse
 - [ ] Replace `TEMPLATE_NAME` everywhere with the class name (e.g. `MySite`)
 - [ ] Replace `TEMPLATE_DOMAIN` with the real domain (e.g. `example.com`)
 - [ ] Replace `TEMPLATE_AUTHOR` with the GitHub username
-- [ ] Update `package.json` → `name` and `classes` fields
+- [ ] Update the exported `SourceInfo` object in the main source file
 - [ ] Update URL patterns in `getViewMoreItems()` and `getSearchResults()`
 - [ ] Update home section selectors in `parseLatestUpdates()`, `parsePopular()`, `parseNewManga()`
 - [ ] Update grid selector in `parseMangaGrid()`

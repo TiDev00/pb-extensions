@@ -11,7 +11,6 @@
 //
 // LOCAL DEV: bypass TLS certificate validation when running behind a corporate
 // SSL-inspection proxy. Set LOCAL_DEV=1 in your shell to enable this.
-// Never needed (and never set) in CI.
 "use strict";
 if (process.env.LOCAL_DEV === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";

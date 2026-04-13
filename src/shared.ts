@@ -11,7 +11,10 @@ const MOBILE_USER_AGENT =
 const CLOUDFLARE_BYPASS_MESSAGE =
   'CLOUDFLARE BYPASS ERROR:\nGo to Source settings and tap "Cloudflare Bypass".';
 
-export function createSourceRequestManager(baseUrl: string) {
+export function createSourceRequestManager(
+  baseUrl: string,
+  extraHeaders: Record<string, string> = {},
+) {
   return App.createRequestManager({
     requestsPerSecond: DEFAULT_REQUESTS_PER_SECOND,
     requestTimeout: DEFAULT_REQUEST_TIMEOUT,
@@ -22,6 +25,7 @@ export function createSourceRequestManager(baseUrl: string) {
           ...(request.headers ?? {}),
           "user-agent": MOBILE_USER_AGENT,
           referer: baseUrl,
+          ...extraHeaders,
         },
       }),
       interceptResponse: async (response) => response,

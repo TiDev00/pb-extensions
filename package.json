@@ -11,8 +11,7 @@
     "build": "paperback bundle",
     "serve": "paperback serve",
     "lint": "eslint --ext .ts src/",
-    "pretest": "pnpm run build",
-    "test": "node tests/SourceTester.js",
+    "test": "pnpm run build && node tests/SourceTester.js",
     "test:local": "LOCAL_DEV=1 node tests/SourceTester.js"
   },
   "devDependencies": {

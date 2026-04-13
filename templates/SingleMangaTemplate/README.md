@@ -16,17 +16,17 @@ Maintenance notes:
 
 - The inline request helpers in `SingleMangaTemplate.ts` intentionally mirror `src/shared.ts` so copied sources stay standalone. If you improve one, update the other.
 - `parseChapterList()` no longer receives a `mangaId` argument because the template implementation never used it.
+- The authoritative metadata lives in the exported `SourceInfo` object inside `SingleMangaTemplate.ts`.
 
 ---
 
 ## Files
 
-| File                           | Purpose                                                             |
-| ------------------------------ | ------------------------------------------------------------------- |
-| `SingleMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface                   |
-| `SingleMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic                           |
-| `package.json`                 | Local manifest for workspace metadata and copy-time source metadata |
-| `includes/icon.png`            | 512×512 PNG icon _(must be added)_                                  |
+| File                           | Purpose                                           |
+| ------------------------------ | ------------------------------------------------- |
+| `SingleMangaTemplate.ts`       | Source class — HTTP requests, Paperback interface |
+| `SingleMangaTemplateParser.ts` | Cheerio parsing — all HTML scraping logic         |
+| `includes/icon.png`            | 512×512 PNG icon _(must be added)_                |
 
 ---
 
@@ -48,7 +48,7 @@ mv src/MyNewSource/SingleMangaTemplateParser.ts  src/MyNewSource/MyNewSourcePars
 - [ ] Replace `TEMPLATE_DOMAIN` with the real domain (e.g. `example.com`)
 - [ ] Replace `TEMPLATE_AUTHOR` with the GitHub username
 - [ ] Set `MANGA_ID_SLUG` to the URL path of the manga page
-- [ ] Update `package.json` → `name` and `classes` fields
+- [ ] Update the exported `SourceInfo` object in the main source file
 - [ ] Update selectors in `*Parser.ts` — start with `parseMangaDetails` and `parseChapterList`
 - [ ] Update the search keywords in `getSearchResults()` to match the title
 - [ ] Add `includes/icon.png` (512×512 PNG)

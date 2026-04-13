@@ -32,12 +32,7 @@ const API_BASE_URL = "https://api.mangadex.org";
 const MANGA_PAGE_SIZE = 20;
 const CHAPTER_PAGE_SIZE = 100;
 const MAX_CHAPTER_PAGE_REQUESTS = 100;
-const DEFAULT_CONTENT_RATINGS = [
-  "safe",
-  "suggestive",
-  "erotic",
-  "pornographic",
-];
+const DEFAULT_CONTENT_RATINGS = ["safe", "suggestive", "erotica"];
 const SUPPORTED_LANGUAGE = "en";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -77,7 +72,9 @@ export class MangaDex extends Source {
   readonly parser = new MangaDexParser();
   readonly baseUrl = WEBSITE_BASE_URL;
   readonly apiBaseUrl = API_BASE_URL;
-  readonly requestManager = createSourceRequestManager(API_BASE_URL);
+  readonly requestManager = createSourceRequestManager(WEBSITE_BASE_URL, {
+    Accept: "application/vnd.api+json, application/json",
+  });
 
   async getMangaDetails(mangaId: string): Promise<SourceManga> {
     this.assertUuid(mangaId, "manga");
@@ -253,14 +250,19 @@ export class MangaDex extends Source {
     path: string,
     query: Record<string, QueryValue> = {},
   ): Promise<T> {
+    const url = this.buildApiUrl(path, query);
     const response = await this.requestManager.schedule(
-      createGetRequest(this.buildApiUrl(path, query)),
+      createGetRequest(url),
       1,
     );
 
     if (response.status >= 400) {
+      // Include the full URL and a snippet of the response body to aid debugging.
+      const snippet = String(response.data ?? "")
+        .slice(0, 300)
+        .replace(/\n/g, " ");
       throw new Error(
-        `MangaDex API request failed with status ${response.status} for ${path}`,
+        `MangaDex API request failed with status ${response.status} for ${path} — ${url} — ${snippet}`,
       );
     }
 
