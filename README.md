@@ -18,10 +18,9 @@ https://tidev00.github.io/pb-extensions/
 
 ## Available Extensions
 
-| Extension      | Site                       | Description                                                         |
-| -------------- | -------------------------- | ------------------------------------------------------------------- |
-| MangaDex       | https://mangadex.org       | Paperback extension for MangaDex powered by the official public API |
-| ReadJJKColored | https://readjjkcolored.com | Jujutsu Kaisen — full AI-colorized HD scans                         |
+| Extension      | Site                       | Description                                 |
+| -------------- | -------------------------- | ------------------------------------------- |
+| ReadJJKColored | https://readjjkcolored.com | Jujutsu Kaisen — full AI-colorized HD scans |
 
 ---
 
@@ -64,10 +63,6 @@ Point the Paperback app at `http://<your-local-ip>:8080` to test against a local
 ```
 pb-extensions/
 ├── src/
-│   ├── MangaDex/
-│   │   ├── MangaDex.ts
-│   │   ├── MangaDexParser.ts
-│   │   └── includes/
 │   └── ReadJJKColored/
 │       ├── ReadJJKColored.ts
 │       └── includes/
