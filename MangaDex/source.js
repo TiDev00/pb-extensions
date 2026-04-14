@@ -1008,21 +1008,25 @@ var _Sources = (() => {
       }));
       sections.forEach(({ section }) => sectionCallback(section));
       const loadResults = await Promise.all(
-        sections.map(
-          async ({ id, title, section }) => {
-            try {
-              const response = await this.fetchMangaSection(id, 1);
-              section.items = this.parser.parseMangaTiles(response.data);
-              sectionCallback(section);
-              return { loaded: true };
-            } catch (error) {
-              return {
-                error: createSectionLoadError(error, title),
-                loaded: false
-              };
-            }
+        sections.map(async ({ id, title }) => {
+          try {
+            const response = await this.fetchMangaSection(id, 1);
+            const populatedSection = App.createHomeSection({
+              id,
+              title,
+              type: import_types.HomeSectionType.singleRowNormal,
+              containsMoreItems: true,
+              items: this.parser.parseMangaTiles(response.data)
+            });
+            sectionCallback(populatedSection);
+            return { loaded: true };
+          } catch (error) {
+            return {
+              error: createSectionLoadError(error, title),
+              loaded: false
+            };
           }
-        )
+        })
       );
       const firstError = loadResults.find((result) => result.error)?.error;
       if (!loadResults.some((result) => result.loaded) && firstError) {
