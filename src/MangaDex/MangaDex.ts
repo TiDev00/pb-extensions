@@ -149,23 +149,26 @@ export class MangaDex extends Source {
     sections.forEach(({ section }) => sectionCallback(section));
 
     const loadResults = await Promise.all(
-      sections.map(
-        async ({ id, title, section }): Promise<SectionLoadResult> => {
-          try {
-            const response = await this.fetchMangaSection(id, 1);
-            // Paperback updates existing section references after the shell is rendered.
-            section.items = this.parser.parseMangaTiles(response.data);
-            sectionCallback(section);
+      sections.map(async ({ id, title }): Promise<SectionLoadResult> => {
+        try {
+          const response = await this.fetchMangaSection(id, 1);
+          const populatedSection = App.createHomeSection({
+            id,
+            title,
+            type: HomeSectionType.singleRowNormal,
+            containsMoreItems: true,
+            items: this.parser.parseMangaTiles(response.data),
+          });
+          sectionCallback(populatedSection);
 
-            return { loaded: true };
-          } catch (error) {
-            return {
-              error: createSectionLoadError(error, title),
-              loaded: false,
-            };
-          }
-        },
-      ),
+          return { loaded: true };
+        } catch (error) {
+          return {
+            error: createSectionLoadError(error, title),
+            loaded: false,
+          };
+        }
+      }),
     );
 
     const firstError = loadResults.find((result) => result.error)?.error;
