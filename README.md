@@ -1,201 +1,109 @@
 # pb-extensions
 
-A [Paperback](https://paperback.moe) extension repository targeting **Paperback v0.8**.
+Lightweight collection of Paperback (v0.8) extensions and templates.
 
----
+This repository contains source code and templates used to build Paperback extension bundles.
 
-## Using this repository in Paperback
+## Quick links
 
-Add the following URL as a repository in the Paperback app:
+- Add as a repository in Paperback:
 
 ```
 https://tidev00.github.io/pb-extensions/
 ```
 
-> **Steps:** Settings → Extensions → Edit → + → paste the URL above → Done.
+## Quick start (developer)
 
----
+Prerequisites
 
-## Available Extensions
+- Node.js (LTS recommended, >= 18)
+- pnpm (uses `pnpm` as the package manager)
 
-| Extension      | Site                       | Description                                 |
-| -------------- | -------------------------- | ------------------------------------------- |
-| ReadJJKColored | https://readjjkcolored.com | Jujutsu Kaisen — full AI-colorized HD scans |
-
----
-
-## For Developers
-
-### Prerequisites
-
-- Node.js ≥ 20
-- pnpm ≥ 7
-
-### Getting started
+Install and build
 
 ```bash
 git clone https://github.com/TiDev00/pb-extensions
 cd pb-extensions
 pnpm install
+pnpm run build    # runs the local `paperback` toolchain to produce bundles/
+pnpm run serve    # serve bundles locally for testing
 ```
 
-### Build & test locally
+Run tests (integration)
 
 ```bash
-pnpm run build                        # compile all extensions
-pnpm test                             # build then run integration tests for all sources
-pnpm test -- ReadJJKColored           # build then test a single source
-pnpm run serve                        # serve the repo locally (default: port 8080)
+pnpm test         # build then run tests/SourceTester.js
+pnpm run test:local # run SourceTester.js in LOCAL_DEV mode
 ```
 
-`pnpm test` runs `tests/SourceTester.js`, a live integration test runner that hits the real website and verifies `getHomePageSections`, `getMangaDetails`, `getChapters`, `getChapterDetails`, and `getSearchResults` for every source in `src/`.
+Notes
 
-For local development behind a corporate SSL-inspection proxy, prefix with `LOCAL_DEV=1`:
+- `pnpm run build` uses `paperback bundle` provided by `@paperback/toolchain`.
+- `pnpm run serve` uses `paperback serve` to host a local discovery URL (default port 8080).
 
-```bash
-LOCAL_DEV=1 pnpm test
+## Available scripts (from `package.json`)
+
+- **prebuild**: small helper to normalize icons (`.jpg` → `.png`) in `src/*/includes`
+- **build**: `paperback bundle` (produces `bundles/`)
+- **serve**: `paperback serve` (local dev server)
+- **lint**: `eslint --ext .ts src/`
+- **test**: `pnpm run build && node tests/SourceTester.js`
+- **test:local**: `LOCAL_DEV=1 node tests/SourceTester.js`
+
+## Repo layout
+
 ```
-
-Point the Paperback app at `http://<your-local-ip>:8080` to test against a local build.
-
-### Repository structure
-
-```
-pb-extensions/
-├── src/
-│   └── ReadJJKColored/
-│       ├── ReadJJKColored.ts
-│       └── includes/
-├── templates/
-│   ├── SingleMangaTemplate/     ← starting point for single-title sites
-│   └── MultiMangaTemplate/      ← starting point for full-catalogue sites
-├── bundles/                     ← compiled output (git-ignored, built by CI)
-├── .github/workflows/
-│   └── deploy.yml               ← CI: build → test → deploy to deployment branch
+.
+├── bundles/                # compiled output (built by CI or `pnpm run build`)
+├── src/                    # extension implementations (one folder per source)
+├── templates/              # starter templates for building new sources
+├── tests/                  # integration / test utilities (e.g. SourceTester.js)
 ├── package.json
 ├── tsconfig.json
 └── README.md
 ```
 
-### Creating a new extension
-
-#### 1. Pick a template
-
-| Site type                           | Template              |
-| ----------------------------------- | --------------------- |
-| One manga / one series only         | `SingleMangaTemplate` |
-| Full catalogue with search & browse | `MultiMangaTemplate`  |
-
-See each template's `README.md` for a full adaptation checklist.
-
-#### 2. Copy the template
-
-```bash
-cp -r templates/SingleMangaTemplate src/MyNewSource
-# or
-cp -r templates/MultiMangaTemplate  src/MyNewSource
-```
-
-#### 3. Replace placeholders
-
-Search and replace across all files inside the new folder:
-
-| Placeholder                   | Replace with                        |
-| ----------------------------- | ----------------------------------- |
-| `TEMPLATE_NAME`               | Extension class name, e.g. `MySite` |
-| `https://TEMPLATE_DOMAIN.com` | The actual site URL                 |
-| `TEMPLATE_AUTHOR`             | GitHub username                     |
-
-Rename the `.ts` files to match the class name, and update the import path inside the main source file.
-
-#### 4. Update selectors
-
-Open `*Parser.ts` and update the CSS selectors to match the target site's HTML structure. Use browser DevTools to inspect the relevant elements:
-
-- Cover image, title, author, description, status
-- Chapter list rows, chapter links, release dates
-- Reader page image URLs
-
-#### 5. Update `SourceInfo`
-
-Inside `src/MyNewSource/MyNewSource.ts`, edit the exported `SourceInfo` object so the live source metadata matches the site:
-
-- `name`
-- `author`
-- `authorWebsite`
-- `description`
-- `websiteBaseURL`
-- `sourceTags`
-- `intents`
-
-#### 6. Add an icon
-
-Place a 512×512 PNG named `icon.png` inside an `includes/` subfolder:
+Typical source layout
 
 ```
-src/MyNewSource/
-├── includes/
-│   └── icon.png
-├── MyNewSource.ts
-└── MyNewSourceParser.ts
+src/MySource/
+├── MySource.ts
+├── MySourceParser.ts
+└── includes/
+    └── icon.png
 ```
 
----
+## Creating a new extension (summary)
+
+1. Copy a template from `templates/SingleMangaTemplate` or `templates/MultiMangaTemplate` into `src/YourSource`.
+2. Replace template placeholders (class name, domain, author) and update `SourceInfo` metadata.
+3. Update parser selectors in `*Parser.ts` to match the target site's HTML.
+4. Add a 512×512 `includes/icon.png` for the source icon.
+5. `pnpm run build` and `pnpm run serve` to test locally.
+
+## Testing
+
+- `tests/SourceTester.js` is the integration test runner used by `pnpm test`.
+- Use `LOCAL_DEV=1 pnpm test` to run tests against a locally served repo (useful behind proxies).
 
 ## CI / CD
 
-Every push to `master` triggers `.github/workflows/deploy.yml`, which:
+Typical CI will:
 
-1. Installs dependencies
-2. Builds all extensions (`pnpm run build`)
-3. Runs integration tests (`node tests/SourceTester.js`)
-4. Deploys the compiled `bundles/` directory to the `deployment` branch
+1. Install dependencies
+2. Run `pnpm run build`
+3. Run `pnpm test`
+4. Publish `bundles/` to the deployment branch or GitHub Pages
 
-The `deployment` branch root is served via `raw.githubusercontent.com` and is the URL Paperback fetches to discover and install extensions.
-
-**Required GitHub repository settings:**
-
-- **Settings → Actions → General → Workflow permissions** → set to _Read and write_
-
----
-
-## Key concepts
-
-### Source interface
-
-```
-Paperback App
-    │
-    ├── getHomePageSections()     ← home screen tiles
-    ├── getSearchResults()        ← search bar
-    ├── getMangaDetails()         ← manga info page
-    ├── getChapters()             ← chapter list
-    └── getChapterDetails()       ← page images for a chapter
-```
-
-### IDs
-
-- **`mangaId`** — URL slug of the manga page, e.g. `manga/my-title`
-- **`chapterId`** — URL slug of the chapter page, e.g. `manga/my-title/chapter-1`
-
-IDs must be **stable** — Paperback persists them in the user's library.
-
-### CloudFlare
-
-Sites behind CloudFlare require implementing `getCloudflareBypassRequestAsync()`, which surfaces a **CF Bypass** button in the extension settings so users can solve the challenge in a WebView.
-
----
+Adjust your repository's Actions workflow permissions so the deploy job can push to the deployment branch.
 
 ## Dependencies
 
-| Package                | Purpose                                             |
-| ---------------------- | --------------------------------------------------- |
-| `@paperback/types`     | Paperback v0.8 type definitions & `App.*` factories |
-| `@paperback/toolchain` | `paperback bundle` and `paperback serve` CLI        |
-| `cheerio`              | Server-side HTML parsing (jQuery-like API)          |
-| `typescript`           | Language                                            |
+- `@paperback/toolchain` — bundle + serve CLI
+- `@paperback/types` — type definitions and runtime helpers
+- `cheerio` — HTML parsing
 
----
+See `package.json` for exact versions.
 
 ## License
 
