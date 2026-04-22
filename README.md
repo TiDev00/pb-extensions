@@ -1,21 +1,17 @@
 # pb-extensions
 
-A small collection of Paperback (v0.8) extension sources, templates, and build helpers.
+A collection of Paperback (v0.8) extension sources, templates, and build helpers.
 
-This repository contains source implementations (under `src/`), build output (`bundles/`), starter templates, and test utilities used to produce Paperback extension bundles.
+## Overview
 
-**Live / discovery URL**
-
-Add this repository as a discovery source in Paperback:
-
-https://TiDev00.github.io/pb-extensions/
+This repository provides source implementations (under src/), prebuilt extension bundles (bundles/), starter templates, and test utilities used to build and publish Paperback extension bundles. Add this repository as a discovery source in Paperback to use prebuilt extensions.
 
 ## Quick start (developer)
 
 Requirements
 
 - Node.js (LTS recommended, >= 18)
-- pnpm (this repo uses `pnpm@8+` — see `package.json` → `packageManager`)
+- pnpm (this repo uses `pnpm` as the package manager)
 
 Clone, install, build
 
@@ -23,97 +19,109 @@ Clone, install, build
 git clone https://github.com/TiDev00/pb-extensions.git
 cd pb-extensions
 pnpm install
-pnpm run build    # produces bundles/
-pnpm run serve    # starts a local discovery server (default port 8080)
+pnpm run build    # runs the local `paperback` toolchain to produce bundles/
+pnpm run serve    # starts a local discovery server
 ```
 
-Run tests
+Development & verification
+
+TypeScript type-check (no emit):
 
 ```bash
-pnpm test         # builds then runs tests/SourceTester.js
-pnpm run test:local # run SourceTester.js in LOCAL_DEV mode (against a local server)
+npx tsc --noEmit -p tsconfig.json
+```
+
+Lint:
+
+```bash
+pnpm run lint
+```
+
+Run the integration tester:
+
+```bash
+pnpm test         # build then run tests/SourceTester.js
+pnpm run test:local # run SourceTester.js in LOCAL_DEV mode
 ```
 
 Notes
 
-- The `prebuild` script normalizes `includes/icon.jpg` → `includes/icon.png` for each source.
-- The build commands use the `paperback` CLI binary provided by `@paperback/toolchain` (installed as a dependency).
+- `pnpm run build` uses `paperback bundle` provided by `@paperback/toolchain`.
+- `pnpm run serve` uses `paperback serve` to host a local discovery URL (default port 8080).
 
-## Scripts (from package.json)
+## Available scripts (from `package.json`)
 
-- `prebuild` — convert source icons in `src/*/includes`
-- `build` — `paperback bundle` (creates `bundles/`)
-- `serve` — `paperback serve` (local dev server)
-- `lint` — `eslint --ext .ts src/`
-- `test` — `pnpm run build && node tests/SourceTester.js`
-- `test:local` — `LOCAL_DEV=1 node tests/SourceTester.js`
+- **prebuild**: small helper to normalize icons (`.jpg` → `.png`) in `src/*/includes`
+- **build**: `paperback bundle` (produces `bundles/`)
+- **serve**: `paperback serve` (local dev server)
+- **lint**: `eslint --ext .ts src/`
+- **test**: `pnpm run build && node tests/SourceTester.js`
+- **test:local**: `LOCAL_DEV=1 node tests/SourceTester.js`
 
-## Repository layout
+<!-- ## Repository layout
 
 ```
 .
 ├── bundles/                # compiled output (produced by `pnpm run build`)
-├── src/                    # source implementations (one directory per extension)
+├── src/
+│   ├── shared.ts           # shared helpers used by sources
 │   ├── PunkRecordz/
-│   │   └── PunkRecordz.ts
+│   │   ├── PunkRecordz.ts
+│   │   └── PunkRecordzParser.ts
 │   └── ReadJJKColored/
-├── templates/              # starter templates for single/multi-source implementations
+│       ├── ReadJJKColored.ts
+│       └── ReadJJKColoredParser.ts
+├── templates/              # starter templates (self-contained helpers)
 ├── tests/                  # integration/test helpers (e.g. SourceTester.js)
 ├── package.json
 ├── tsconfig.json
 └── README.md
-```
+``` -->
 
-Typical source layout
-
-```
-src/YourSource/
-├── YourSource.ts
-├── YourSourceParser.ts
-└── includes/
-    └── icon.png
-```
-
-## Creating a new extension (summary)
+## Creating a new extension (recommended workflow)
 
 1. Copy a template from `templates/SingleMangaTemplate` or `templates/MultiMangaTemplate` into `src/YourSource`.
-2. Update class names, `SourceInfo` metadata, and parser selectors to match the target site.
-3. Add a 512×512 `includes/icon.png` for the source icon.
-4. Run `pnpm run build` and `pnpm run serve` to test locally.
+2. Implement parsing logic in `YourSourceParser.ts` (parsers focus on HTML → domain objects).
+3. Keep the Source implementation thin: network requests, caching, and orchestration belong in `YourSource.ts` and should delegate parsing to the parser class.
+4. Reuse helpers from [src/shared.ts](src/shared.ts) (createSourceRequestManager, createGetRequest, createCloudflareBypassRequest, throwIfCloudflareBlocked, getPageNumber).
+5. Add a 512×512 `includes/icon.png` and let the `prebuild` script normalize icons.
+6. Run `pnpm run build`, `npx tsc --noEmit -p tsconfig.json`, and `pnpm run test` to verify.
+
+Bundles & publishing
+
+- `pnpm run build` produces extension bundles in `bundles/`.
+- Publish the `bundles/` directory (for example, to GitHub Pages or a deployment branch) to expose a discovery URL to Paperback.
 
 ## Testing
 
 - `tests/SourceTester.js` is the integration test runner used by `pnpm test`.
-- Use `LOCAL_DEV=1 pnpm run test` to run tests against a running local `pnpm run serve` instance.
+- Use `LOCAL_DEV=1 pnpm test` to run tests against a locally served repo (useful behind proxies).
 
-## CI / CD (recommended)
+## CI / CD
 
-Typical CI pipeline:
+Typical CI will:
 
-1. Install dependencies (`pnpm install`)
-2. Run lint (`pnpm run lint`)
-3. Build (`pnpm run build`)
-4. Run tests (`pnpm test`)
-5. Publish `bundles/` (e.g., to GitHub Pages or a deployment branch)
+1. Install dependencies
+2. Run `pnpm run build`
+3. Run `pnpm test`
+4. Publish `bundles/` to the deployment branch or GitHub Pages
 
-Ensure your CI has permissions to push the deployment artifacts if you publish to a branch.
+Adjust your repository's Actions workflow permissions so the deploy job can push to the deployment branch.
 
-## Contributing
+## Contributing & PR checklist
 
-Contributions are welcome. When opening a PR:
-
-- Keep changes focused (one source / template per PR).
-- Include a short description and testing steps.
-- If adding a new source, include its `includes/icon.png` and update any templates you used.
+- Keep PRs focused (one source or extension per PR).
+- Include testing steps and verification commands in the PR description.
+- Add the source icon and verify `prebuild` behaviour.
 
 ## Dependencies
 
-See `package.json` for exact versions. Key dependencies:
+- `@paperback/toolchain` — bundle + serve CLI
+- `@paperback/types` — type definitions and runtime helpers
+- `cheerio` — HTML parsing
 
-- `@paperback/toolchain`
-- `@paperback/types`
-- `cheerio`
+See `package.json` for exact versions.
 
 ## License
 
-MIT
+[MIT](LICENSE)
