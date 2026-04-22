@@ -763,51 +763,75 @@ var _Sources = (() => {
     }
   }
 
-  // src/ReadJJKColored/ReadJJKColored.ts
-  var BASE_URL = "https://readjjkcolored.com";
-  var CONFIG_URL = `${BASE_URL}/config.js`;
-  var MANGA_ID = "jjk-colored";
+  // src/ReadJJKColored/ReadJJKColoredParser.ts
   var FALLBACK_IMAGE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk/chapter%201/01_colorized.webp";
   var FALLBACK_BASE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk";
-  var ReadJJKColoredInfo = {
-    version: "1.0.0",
-    name: "ReadJJKColored",
-    icon: "icon.png",
-    author: "TiDev00",
-    description: "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
-    contentRating: import_types.ContentRating.EVERYONE,
-    websiteBaseURL: BASE_URL,
-    sourceTags: [
-      { text: "English", type: import_types.BadgeColor.GREY },
-      { text: "Colored", type: import_types.BadgeColor.BLUE }
-    ],
-    intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS | import_types.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
-  };
-  var ReadJJKColored = class extends import_types.Source {
-    constructor() {
-      super(...arguments);
-      this.baseUrl = BASE_URL;
-      this.requestManager = createSourceRequestManager(BASE_URL);
-      /** In-memory cache — avoids re-fetching config.js on every method call */
-      this._config = null;
-    }
-    async getCloudflareBypassRequestAsync() {
-      return createCloudflareBypassRequest(this.baseUrl);
-    }
-    // ── Config loader ─────────────────────────────────────────────────────────
-    async loadConfig() {
-      if (this._config) return this._config;
-      const response = await this.requestManager.schedule(
-        createGetRequest(CONFIG_URL),
-        1
+  var MANGA_ID = "jjk-colored";
+  var ReadJJKColoredParser = class {
+    /**
+     * Parses the raw config.js text into a typed SiteConfig.
+     *
+     * The real file structure (confirmed from live site):
+     *
+     *   const CHAPTER_PAGE_COUNTS = [58, 26, 23, ...];
+     *
+     *   const MANGA_CONFIG = {
+     *     title: "Jujutsu Kaisen",
+     *     ...
+     *     chapters: CHAPTER_PAGE_COUNTS.map((pageCount, index) => ({
+     *       id: "chapter" + (index + 1),
+     *       folder: "https://.../colorizedjjk/chapter " + (index + 1),
+     *       pageCount,
+     *       coverImage: "01_colorized.webp"
+     *     })),
+     *     fileNaming: { prefix: "", suffix: "_colorized", extension: ".webp" },
+     *   };
+     *
+     * Because chapters is computed via .map(), there are no literal object entries
+     * to regex-parse. Instead we read CHAPTER_PAGE_COUNTS directly.
+     */
+    parseConfigJs(raw) {
+      const countsBlock = raw.match(
+        /const\s+CHAPTER_PAGE_COUNTS\s*=\s*\[([\s\S]*?)\]/
       );
-      throwIfCloudflareBlocked(response.status);
-      this._config = parseConfigJs(response.data);
-      return this._config;
+      const pageCounts = countsBlock ? (countsBlock[1].match(/\d+/g) ?? []).map(Number) : [];
+      const baseMatch = raw.match(
+        /folder:\s*["'](https:\/\/[^"']+?)\/chapter\s*["']/
+      );
+      const imageBaseUrl = baseMatch?.[1] ?? FALLBACK_BASE_URL;
+      const filePrefix = this.extractStr(raw, "prefix") ?? "";
+      const fileSuffix = this.extractStr(raw, "suffix") ?? "_colorized";
+      const fileExtension = this.extractStr(raw, "extension") ?? ".webp";
+      const title = this.extractStr(raw, "title") ?? "Jujutsu Kaisen";
+      const description = this.extractStr(raw, "description") ?? "";
+      const author = this.extractStr(raw, "author") ?? "Gege Akutami";
+      const chapters = pageCounts.map((pageCount, index) => ({
+        id: `chapter${index + 1}`,
+        title: `Chapter ${index + 1}`,
+        folder: `chapter ${index + 1}`,
+        // relative — passed to encodeFolder()
+        pageCount,
+        releaseDate: "",
+        coverImage: `01_colorized${fileExtension}`,
+        chapNum: index + 1,
+        volume: void 0
+      })).filter((ch) => ch.pageCount > 0);
+      chapters.sort((a, b) => b.chapNum - a.chapNum);
+      const ch1 = chapters[chapters.length - 1];
+      const coverImageUrl = ch1 ? `${imageBaseUrl}/${this.encodeFolder(ch1.folder)}/01_colorized${fileExtension}` : FALLBACK_IMAGE_URL;
+      return {
+        title,
+        description,
+        author,
+        coverImageUrl,
+        imageBaseUrl,
+        filePrefix,
+        fileSuffix,
+        fileExtension,
+        chapters
+      };
     }
-    // ── Paperback API ─────────────────────────────────────────────────────────
-    async getMangaDetails(_mangaId) {
-      const cfg = await this.loadConfig();
+    parseMangaDetails(cfg) {
       return App.createSourceManga({
         id: MANGA_ID,
         mangaInfo: App.createMangaInfo({
@@ -833,8 +857,7 @@ var _Sources = (() => {
         })
       });
     }
-    async getChapters(_mangaId) {
-      const cfg = await this.loadConfig();
+    parseChapterList(cfg) {
       return cfg.chapters.map(
         (ch) => App.createChapter({
           id: ch.id,
@@ -846,27 +869,14 @@ var _Sources = (() => {
         })
       );
     }
-    async getChapterDetails(_mangaId, chapId) {
-      const cfg = await this.loadConfig();
+    parseChapterDetails(cfg, chapId) {
       const ch = cfg.chapters.find((c) => c.id === chapId);
-      const pages = ch ? buildPageUrls(ch, cfg) : [];
-      return App.createChapterDetails({
-        id: chapId,
-        mangaId: MANGA_ID,
-        pages
-      });
+      const pages = ch ? this.buildPageUrls(ch, cfg) : [];
+      return App.createChapterDetails({ id: chapId, mangaId: MANGA_ID, pages });
     }
-    async getHomePageSections(sectionCallback) {
-      const section = App.createHomeSection({
-        id: "jjk_colored",
-        title: "Jujutsu Kaisen \u2013 Colored",
-        type: import_types.HomeSectionType.singleRowNormal,
-        containsMoreItems: false
-      });
-      sectionCallback(section);
-      const cfg = await this.loadConfig();
+    parseHomeItems(cfg) {
       const latest = cfg.chapters[0];
-      section.items = [
+      return [
         App.createPartialSourceManga({
           mangaId: MANGA_ID,
           image: cfg.coverImageUrl,
@@ -874,89 +884,131 @@ var _Sources = (() => {
           subtitle: latest?.title ?? ""
         })
       ];
-      sectionCallback(section);
+    }
+    matchesSearchQuery(query) {
+      const q = query.toLowerCase();
+      if (!q) return true;
+      const keywords = ["jujutsu", "kaisen", "jjk", "colored", "colour", "color"];
+      return keywords.some((k) => q.includes(k));
+    }
+    // ── Private helpers ──────────────────────────────────────────────────────
+    /**
+     * Generates ordered page image URLs for one chapter.
+     *
+     * Pattern from static HTML:
+     *   {imageBaseUrl}/{folder}/{prefix}{NN}{suffix}{extension}
+     *
+     * Example output:
+     *   https://pub-....r2.dev/colorizedjjk/chapter%201/01_colorized.webp
+     *   https://pub-....r2.dev/colorizedjjk/chapter%201/02_colorized.webp
+     *   ...
+     */
+    buildPageUrls(ch, cfg) {
+      const folder = this.encodeFolder(ch.folder);
+      const pages = [];
+      for (let i = 1; i <= ch.pageCount; i++) {
+        const nn = String(i).padStart(2, "0");
+        const filename = `${cfg.filePrefix}${nn}${cfg.fileSuffix}${cfg.fileExtension}`;
+        pages.push(`${cfg.imageBaseUrl}/${folder}/${filename}`);
+      }
+      return pages;
+    }
+    /** URL-encodes each path segment while preserving forward slashes */
+    encodeFolder(folder) {
+      return folder.split("/").map(encodeURIComponent).join("/");
+    }
+    /** Extracts the string value of a JS object key (handles single/double quotes) */
+    extractStr(src, key) {
+      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(
+        `["']?${escapedKey}["']?\\s*:\\s*["']([^"'\\r\\n]+)["']`
+      );
+      return src.match(re)?.[1]?.trim();
+    }
+  };
+
+  // src/ReadJJKColored/ReadJJKColored.ts
+  var BASE_URL = "https://readjjkcolored.com";
+  var CONFIG_URL = `${BASE_URL}/config.js`;
+  var ReadJJKColoredInfo = {
+    version: "1.0.0",
+    name: "ReadJJKColored",
+    icon: "icon.png",
+    author: "TiDev00",
+    description: "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
+    contentRating: import_types.ContentRating.EVERYONE,
+    websiteBaseURL: BASE_URL,
+    sourceTags: [
+      { text: "English", type: import_types.BadgeColor.GREY },
+      { text: "Colored", type: import_types.BadgeColor.BLUE }
+    ],
+    intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS | import_types.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
+  };
+  var ReadJJKColored = class extends import_types.Source {
+    constructor() {
+      super(...arguments);
+      this.parser = new ReadJJKColoredParser();
+      this.baseUrl = BASE_URL;
+      this.requestManager = createSourceRequestManager(BASE_URL);
+      /** In-memory cache — avoids re-fetching config.js on every method call */
+      this._config = null;
+    }
+    async getCloudflareBypassRequestAsync() {
+      return createCloudflareBypassRequest(this.baseUrl);
+    }
+    async getMangaDetails(_mangaId) {
+      const cfg = await this.loadConfig();
+      return this.parser.parseMangaDetails(cfg);
+    }
+    async getChapters(_mangaId) {
+      const cfg = await this.loadConfig();
+      return this.parser.parseChapterList(cfg);
+    }
+    async getChapterDetails(_mangaId, chapId) {
+      const cfg = await this.loadConfig();
+      return this.parser.parseChapterDetails(cfg, chapId);
+    }
+    async getHomePageSections(sectionCallback) {
+      sectionCallback(
+        App.createHomeSection({
+          id: "jjk_colored",
+          title: "Jujutsu Kaisen \u2013 Colored",
+          type: import_types.HomeSectionType.singleRowNormal,
+          containsMoreItems: false
+        })
+      );
+      const cfg = await this.loadConfig();
+      const populated = App.createHomeSection({
+        id: "jjk_colored",
+        title: "Jujutsu Kaisen \u2013 Colored",
+        type: import_types.HomeSectionType.singleRowNormal,
+        containsMoreItems: false
+      });
+      populated.items = this.parser.parseHomeItems(cfg);
+      sectionCallback(populated);
     }
     async getSearchResults(query, _metadata) {
-      const q = (query.title ?? "").toLowerCase();
-      const keywords = ["jujutsu", "kaisen", "jjk", "colored", "colour", "color"];
-      const hit = !q || keywords.some((k) => q.includes(k));
-      if (!hit) return App.createPagedResults({ results: [] });
+      if (!this.parser.matchesSearchQuery(query.title ?? "")) {
+        return App.createPagedResults({ results: [] });
+      }
       const cfg = await this.loadConfig();
-      return App.createPagedResults({
-        results: [
-          App.createPartialSourceManga({
-            mangaId: MANGA_ID,
-            image: cfg.coverImageUrl,
-            title: cfg.title
-          })
-        ]
-      });
+      return App.createPagedResults({ results: this.parser.parseHomeItems(cfg) });
     }
     getMangaShareUrl(mangaId) {
       return `${this.baseUrl}/?manga=${mangaId}`;
     }
-  };
-  function parseConfigJs(raw) {
-    const countsBlock = raw.match(
-      /const\s+CHAPTER_PAGE_COUNTS\s*=\s*\[([\s\S]*?)\]/
-    );
-    const pageCounts = countsBlock ? (countsBlock[1].match(/\d+/g) ?? []).map(Number) : [];
-    const baseMatch = raw.match(
-      /folder:\s*["'](https:\/\/[^"']+?)\/chapter\s*["']/
-    );
-    const imageBaseUrl = baseMatch?.[1] ?? FALLBACK_BASE_URL;
-    const filePrefix = extractStr(raw, "prefix") ?? "";
-    const fileSuffix = extractStr(raw, "suffix") ?? "_colorized";
-    const fileExtension = extractStr(raw, "extension") ?? ".webp";
-    const title = extractStr(raw, "title") ?? "Jujutsu Kaisen";
-    const description = extractStr(raw, "description") ?? "";
-    const author = extractStr(raw, "author") ?? "Gege Akutami";
-    const chapters = pageCounts.map((pageCount, index) => ({
-      id: `chapter${index + 1}`,
-      title: `Chapter ${index + 1}`,
-      folder: `chapter ${index + 1}`,
-      // relative — passed to encodeFolder()
-      pageCount,
-      releaseDate: "",
-      coverImage: `01_colorized${fileExtension}`,
-      chapNum: index + 1,
-      volume: void 0
-    })).filter((ch) => ch.pageCount > 0);
-    chapters.sort((a, b) => b.chapNum - a.chapNum);
-    const ch1 = chapters[chapters.length - 1];
-    const coverImageUrl = ch1 ? `${imageBaseUrl}/${encodeFolder(ch1.folder)}/01_colorized${fileExtension}` : FALLBACK_IMAGE_URL;
-    return {
-      title,
-      description,
-      author,
-      coverImageUrl,
-      imageBaseUrl,
-      filePrefix,
-      fileSuffix,
-      fileExtension,
-      chapters
-    };
-  }
-  function buildPageUrls(ch, cfg) {
-    const folder = encodeFolder(ch.folder);
-    const pages = [];
-    for (let i = 1; i <= ch.pageCount; i++) {
-      const nn = String(i).padStart(2, "0");
-      const filename = `${cfg.filePrefix}${nn}${cfg.fileSuffix}${cfg.fileExtension}`;
-      pages.push(`${cfg.imageBaseUrl}/${folder}/${filename}`);
+    // ── Private helpers ──────────────────────────────────────────────────────
+    async loadConfig() {
+      if (this._config) return this._config;
+      const response = await this.requestManager.schedule(
+        createGetRequest(CONFIG_URL),
+        1
+      );
+      throwIfCloudflareBlocked(response.status);
+      this._config = this.parser.parseConfigJs(response.data);
+      return this._config;
     }
-    return pages;
-  }
-  function encodeFolder(folder) {
-    return folder.split("/").map(encodeURIComponent).join("/");
-  }
-  function extractStr(src, key) {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(
-      `["']?${escapedKey}["']?\\s*:\\s*["']([^"'\\r\\n]+)["']`
-    );
-    return src.match(re)?.[1]?.trim();
-  }
+  };
   return __toCommonJS(ReadJJKColored_exports);
 })();
 this.Sources = _Sources; if (typeof exports === 'object' && typeof module !== 'undefined') {module.exports.Sources = this.Sources;}

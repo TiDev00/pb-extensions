@@ -766,183 +766,231 @@ var _Sources = (() => {
     return metadata?.page ?? 1;
   }
 
-  // src/PunkRecordz/PunkRecordz.ts
-  var BASE_URL = "https://punkrecordz.com";
+  // src/PunkRecordz/PunkRecordzParser.ts
   var CATALOG_PATH = "mangas";
-  var HOME_SECTION_ID = "catalog";
   var PAGE_SIZE = 20;
+  var BASE_URL = "https://punkrecordz.com";
   var API_IMAGE_BASE_URL = "https://api.punkrecordz.com/images/webp";
-  function coerceString(data) {
-    if (typeof data === "string") return data;
-    if (data != null) return JSON.stringify(data);
-    return "";
-  }
-  function normalizeWhitespace(text) {
-    return text.replace(/\s+/g, " ").trim();
-  }
-  function normalizeTitle(title) {
-    return normalizeWhitespace(
-      title.replace(/\s*\|\s*Punk\s*Record(?:s|z).*$|\s*\|\s*PunkRecordz.*$/i, "").replace(/\s*-\s*Tous les chapitres scan couleur\s*$/i, "").replace(/\s*-\s*Scan couleur\s*$/i, "")
-    );
-  }
-  function absoluteUrl(url) {
-    const trimmedUrl = normalizeWhitespace(url);
-    if (!trimmedUrl) return "";
-    if (trimmedUrl.startsWith("http://") || trimmedUrl.startsWith("https://")) {
-      return trimmedUrl;
-    }
-    if (trimmedUrl.startsWith("//")) {
-      return `https:${trimmedUrl}`;
-    }
-    if (trimmedUrl.startsWith("/")) {
-      return `${BASE_URL}${trimmedUrl}`;
-    }
-    return `${BASE_URL}/${trimmedUrl}`;
-  }
-  function normalizePath(url) {
-    return absoluteUrl(url).replace(/^https?:\/\/[^/]+\/?/i, "").split("?")[0].split("#")[0].replace(/^\/+|\/+$/g, "");
-  }
-  function normalizeSearchText(text) {
-    return normalizeWhitespace(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").toLowerCase();
-  }
-  function extractChapterNumber(text) {
-    const match = text.match(/(\d+(?:\.\d+)?)/);
-    if (!match?.[1]) return 0;
-    const chapterNumber = parseFloat(match[1]);
-    return Number.isNaN(chapterNumber) ? 0 : chapterNumber;
-  }
-  function buildImageUrlFromThumb(thumb) {
-    const normalizedThumb = normalizeWhitespace(thumb);
-    if (!normalizedThumb) return "";
-    return `${API_IMAGE_BASE_URL}/${normalizedThumb}.webp`;
-  }
-  function toPartialSourceManga(manga) {
-    return App.createPartialSourceManga({
-      mangaId: manga.mangaId,
-      image: manga.image,
-      title: manga.title,
-      subtitle: manga.subtitle
-    });
-  }
-  function parseCatalogTiles($) {
-    const mangaMap = /* @__PURE__ */ new Map();
-    $("a[href*='/mangas/']").each((_index, element) => {
-      const mangaPath = normalizePath($(element).attr("href") ?? "");
-      const parts = mangaPath.split("/").filter(Boolean);
-      if (parts.length !== 2 || parts[0] !== CATALOG_PATH) return;
-      const mangaId = parts[1] ?? "";
-      const title = normalizeTitle($(element).find("h4").first().text()) || normalizeTitle($(element).find("img[alt]").first().attr("alt") ?? "") || mangaId;
-      const image = absoluteUrl(
-        $(element).find("img[alt]").first().attr("src") ?? $(element).find("img[alt]").first().attr("data-src") ?? ""
+  var PunkRecordzParser = class {
+    parseCatalog($, html) {
+      return this.mergeCatalogEntries(
+        this.parseCatalogTiles($),
+        this.parseCatalogPayload(html)
       );
-      mangaMap.set(mangaId, {
-        mangaId,
-        title,
-        image
-      });
-    });
-    return [...mangaMap.values()];
-  }
-  function parseCatalogPayload(html) {
-    const mangaMap = /* @__PURE__ */ new Map();
-    const normalizedHtml = html.replace(/\\"/g, '"');
-    const payloadPattern = /"__typename":"Manga","id":"[^"]+","name":"([^"]+)","slug":"([^"]+)","thumb":"([^"]+)","published":true/g;
-    for (const match of normalizedHtml.matchAll(payloadPattern)) {
-      const title = normalizeTitle(match[1] ?? "");
-      const mangaId = normalizeWhitespace(match[2] ?? "");
-      const thumb = normalizeWhitespace(match[3] ?? "");
-      if (!mangaId || !title) continue;
-      mangaMap.set(mangaId, {
-        mangaId,
-        title,
-        image: buildImageUrlFromThumb(thumb)
+    }
+    parseMangaDetails($, mangaId, catalogEntry) {
+      const title = this.normalizeTitle($("h2").first().text()) || this.normalizeTitle(
+        $("meta[property='og:title']").attr("content") ?? ""
+      ) || catalogEntry?.title || mangaId;
+      const description = this.normalizeWhitespace(
+        $("meta[name='description']").attr("content") ?? ""
+      ) || this.normalizeWhitespace($("nav[aria-label] p").first().text()) || "";
+      const image = this.absoluteUrl($("meta[property='og:image']").attr("content") ?? "") || catalogEntry?.image || "";
+      return App.createSourceManga({
+        id: mangaId,
+        mangaInfo: App.createMangaInfo({
+          titles: [title],
+          image,
+          desc: description,
+          status: "Ongoing",
+          hentai: false
+        })
       });
     }
-    return [...mangaMap.values()];
-  }
-  function mergeCatalogEntries(htmlEntries, payloadEntries) {
-    const mergedEntries = /* @__PURE__ */ new Map();
-    const orderedIds = [];
-    const upsert = (entry) => {
-      const existingEntry = mergedEntries.get(entry.mangaId);
-      if (!existingEntry) {
-        mergedEntries.set(entry.mangaId, entry);
-        orderedIds.push(entry.mangaId);
-        return;
+    parseChapterList($, mangaId) {
+      return this.parseChapterRecords($, mangaId).map(
+        (record) => App.createChapter({
+          id: record.chapterId,
+          chapNum: record.chapNum,
+          name: record.name,
+          langCode: "fr",
+          time: /* @__PURE__ */ new Date(0)
+        })
+      );
+    }
+    parseChapterDetails($, mangaId, chapterId) {
+      const pages = this.parseChapterImageUrls($);
+      if (!pages.length) {
+        throw new Error(
+          `PunkRecordz: no pages found for chapter "${chapterId}".`
+        );
       }
-      mergedEntries.set(entry.mangaId, {
-        mangaId: entry.mangaId,
-        title: entry.title || existingEntry.title,
-        image: entry.image || existingEntry.image,
-        subtitle: entry.subtitle ?? existingEntry.subtitle
+      return App.createChapterDetails({ id: chapterId, mangaId, pages });
+    }
+    filterCatalog(catalog, query) {
+      const normalized = this.normalizeSearchText(query);
+      if (!normalized) return catalog;
+      return catalog.filter(
+        (entry) => this.normalizeSearchText(`${entry.title} ${entry.mangaId}`).includes(
+          normalized
+        )
+      );
+    }
+    pagedResults(catalog, page) {
+      const start = (page - 1) * PAGE_SIZE;
+      const results = catalog.slice(start, start + PAGE_SIZE).map((entry) => this.toPartialSourceManga(entry));
+      const hasNextPage = start + PAGE_SIZE < catalog.length;
+      return App.createPagedResults({
+        results,
+        metadata: hasNextPage ? { page: page + 1 } : void 0
       });
-    };
-    htmlEntries.forEach(upsert);
-    payloadEntries.forEach(upsert);
-    return orderedIds.map((mangaId) => mergedEntries.get(mangaId)).filter((entry) => entry != null);
-  }
-  function parseChapterList($, mangaId) {
-    const chapterMap = /* @__PURE__ */ new Map();
-    $(`a[href*='/${CATALOG_PATH}/${mangaId}/']`).each((_index, element) => {
-      const chapterPath = normalizePath($(element).attr("href") ?? "");
-      const parts = chapterPath.split("/").filter(Boolean);
-      if (parts.length !== 3) return;
-      if (parts[0] !== CATALOG_PATH || parts[1] !== mangaId) return;
-      const chapterSlug = parts[2] ?? "";
-      if (!chapterSlug) return;
-      const rawName = normalizeWhitespace($(element).text());
-      const chapterNumber = extractChapterNumber(chapterSlug) || extractChapterNumber(rawName);
-      const resolvedName = rawName || (chapterNumber > 0 ? `Chapitre ${chapterSlug}` : chapterSlug);
-      const nextRecord = {
-        chapterId: chapterPath,
-        chapNum: chapterNumber,
-        name: resolvedName
+    }
+    toPartialSourceManga(manga) {
+      return App.createPartialSourceManga({
+        mangaId: manga.mangaId,
+        image: manga.image,
+        title: manga.title,
+        subtitle: manga.subtitle
+      });
+    }
+    // ── Private helpers ──────────────────────────────────────────────────────
+    parseCatalogTiles($) {
+      const mangaMap = /* @__PURE__ */ new Map();
+      $("a[href*='/mangas/']").each((_index, element) => {
+        const mangaPath = this.normalizePath($(element).attr("href") ?? "");
+        const parts = mangaPath.split("/").filter(Boolean);
+        if (parts.length !== 2 || parts[0] !== CATALOG_PATH) return;
+        const mangaId = parts[1] ?? "";
+        const title = this.normalizeTitle($(element).find("h4").first().text()) || this.normalizeTitle(
+          $(element).find("img[alt]").first().attr("alt") ?? ""
+        ) || mangaId;
+        const image = this.absoluteUrl(
+          $(element).find("img[alt]").first().attr("src") ?? $(element).find("img[alt]").first().attr("data-src") ?? ""
+        );
+        mangaMap.set(mangaId, { mangaId, title, image });
+      });
+      return [...mangaMap.values()];
+    }
+    parseCatalogPayload(html) {
+      const mangaMap = /* @__PURE__ */ new Map();
+      const normalizedHtml = html.replace(/\\"/g, '"');
+      const payloadPattern = /"__typename":"Manga","id":"[^"]+","name":"([^"]+)","slug":"([^"]+)","thumb":"([^"]+)","published":true/g;
+      for (const match of normalizedHtml.matchAll(payloadPattern)) {
+        const title = this.normalizeTitle(match[1] ?? "");
+        const mangaId = this.normalizeWhitespace(match[2] ?? "");
+        const thumb = this.normalizeWhitespace(match[3] ?? "");
+        if (!mangaId || !title) continue;
+        mangaMap.set(mangaId, {
+          mangaId,
+          title,
+          image: this.buildImageUrlFromThumb(thumb)
+        });
+      }
+      return [...mangaMap.values()];
+    }
+    mergeCatalogEntries(htmlEntries, payloadEntries) {
+      const mergedEntries = /* @__PURE__ */ new Map();
+      const orderedIds = [];
+      const upsert = (entry) => {
+        const existing = mergedEntries.get(entry.mangaId);
+        if (!existing) {
+          mergedEntries.set(entry.mangaId, entry);
+          orderedIds.push(entry.mangaId);
+          return;
+        }
+        mergedEntries.set(entry.mangaId, {
+          mangaId: entry.mangaId,
+          title: entry.title || existing.title,
+          image: entry.image || existing.image,
+          subtitle: entry.subtitle ?? existing.subtitle
+        });
       };
-      const existingRecord = chapterMap.get(chapterPath);
-      if (!existingRecord || existingRecord.name.length < nextRecord.name.length) {
-        chapterMap.set(chapterPath, nextRecord);
-      }
-    });
-    return [...chapterMap.values()].sort((left, right) => {
-      if (right.chapNum !== left.chapNum) return right.chapNum - left.chapNum;
-      return right.chapterId.localeCompare(left.chapterId, "en");
-    });
-  }
-  function parseChapterImageUrls($) {
-    const prioritizedUrls = [];
-    const fallbackUrls = [];
-    $("img").each((_index, element) => {
-      const imageUrl = absoluteUrl(
-        $(element).attr("data-src") ?? $(element).attr("src") ?? $(element).attr("data-lazy-src") ?? ""
+      htmlEntries.forEach(upsert);
+      payloadEntries.forEach(upsert);
+      return orderedIds.map((id) => mergedEntries.get(id)).filter((entry) => entry != null);
+    }
+    parseChapterRecords($, mangaId) {
+      const chapterMap = /* @__PURE__ */ new Map();
+      $(`a[href*='/${CATALOG_PATH}/${mangaId}/']`).each((_index, element) => {
+        const chapterPath = this.normalizePath($(element).attr("href") ?? "");
+        const parts = chapterPath.split("/").filter(Boolean);
+        if (parts.length !== 3) return;
+        if (parts[0] !== CATALOG_PATH || parts[1] !== mangaId) return;
+        const chapterSlug = parts[2] ?? "";
+        if (!chapterSlug) return;
+        const rawName = this.normalizeWhitespace($(element).text());
+        const chapterNumber = this.extractChapterNumber(chapterSlug) || this.extractChapterNumber(rawName);
+        const resolvedName = rawName || (chapterNumber > 0 ? `Chapitre ${chapterSlug}` : chapterSlug);
+        const nextRecord = {
+          chapterId: chapterPath,
+          chapNum: chapterNumber,
+          name: resolvedName
+        };
+        const existing = chapterMap.get(chapterPath);
+        if (!existing || existing.name.length < nextRecord.name.length) {
+          chapterMap.set(chapterPath, nextRecord);
+        }
+      });
+      return [...chapterMap.values()].sort((a, b) => {
+        if (b.chapNum !== a.chapNum) return b.chapNum - a.chapNum;
+        return b.chapterId.localeCompare(a.chapterId, "en");
+      });
+    }
+    parseChapterImageUrls($) {
+      const prioritized = [];
+      const fallback = [];
+      $("img").each((_index, element) => {
+        const imageUrl = this.absoluteUrl(
+          $(element).attr("data-src") ?? $(element).attr("src") ?? $(element).attr("data-lazy-src") ?? ""
+        );
+        if (!imageUrl || !imageUrl.includes("api.punkrecordz.com/images/"))
+          return;
+        const alt = this.normalizeSearchText($(element).attr("alt") ?? "");
+        if (alt.includes("page")) {
+          prioritized.push(imageUrl);
+        } else {
+          fallback.push(imageUrl);
+        }
+      });
+      return [...new Set(prioritized.length > 0 ? prioritized : fallback)];
+    }
+    normalizeWhitespace(text) {
+      return text.replace(/\s+/g, " ").trim();
+    }
+    normalizeTitle(title) {
+      return this.normalizeWhitespace(
+        title.replace(/\s*\|\s*Punk\s*Record(?:s|z).*$|\s*\|\s*PunkRecordz.*$/i, "").replace(/\s*-\s*Tous les chapitres scan couleur\s*$/i, "").replace(/\s*-\s*Scan couleur\s*$/i, "")
       );
-      if (!imageUrl || !imageUrl.includes("api.punkrecordz.com/images/")) return;
-      const alt = normalizeSearchText($(element).attr("alt") ?? "");
-      if (alt.includes("page")) {
-        prioritizedUrls.push(imageUrl);
-        return;
-      }
-      fallbackUrls.push(imageUrl);
-    });
-    const resolvedUrls = prioritizedUrls.length > 0 ? prioritizedUrls : fallbackUrls;
-    return [...new Set(resolvedUrls)];
-  }
-  function createPagedCatalogResults(entries, page) {
-    const start = (page - 1) * PAGE_SIZE;
-    const results = entries.slice(start, start + PAGE_SIZE).map(toPartialSourceManga);
-    const hasNextPage = start + PAGE_SIZE < entries.length;
-    return App.createPagedResults({
-      results,
-      metadata: hasNextPage ? { page: page + 1 } : void 0
-    });
-  }
+    }
+    absoluteUrl(url) {
+      const trimmed = this.normalizeWhitespace(url);
+      if (!trimmed) return "";
+      if (trimmed.startsWith("http://") || trimmed.startsWith("https://"))
+        return trimmed;
+      if (trimmed.startsWith("//")) return `https:${trimmed}`;
+      if (trimmed.startsWith("/")) return `${BASE_URL}${trimmed}`;
+      return `${BASE_URL}/${trimmed}`;
+    }
+    normalizePath(url) {
+      return this.absoluteUrl(url).replace(/^https?:\/\/[^/]+\/?/i, "").split("?")[0].split("#")[0].replace(/^\/+|\/+$/g, "");
+    }
+    normalizeSearchText(text) {
+      return this.normalizeWhitespace(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, " ").toLowerCase();
+    }
+    extractChapterNumber(text) {
+      const match = text.match(/(\d+(?:\.\d+)?)/);
+      if (!match?.[1]) return 0;
+      const num = parseFloat(match[1]);
+      return Number.isNaN(num) ? 0 : num;
+    }
+    buildImageUrlFromThumb(thumb) {
+      const normalized = this.normalizeWhitespace(thumb);
+      if (!normalized) return "";
+      return `${API_IMAGE_BASE_URL}/${normalized}.webp`;
+    }
+  };
+
+  // src/PunkRecordz/PunkRecordz.ts
+  var BASE_URL2 = "https://punkrecordz.com";
+  var HOME_SECTION_ID = "catalog";
   var PunkRecordzInfo = {
     version: "1.0.0",
     name: "PunkRecordz",
     icon: "icon.png",
     author: "TiDev00",
-    description: "Read colored manga from Punk Recordz.",
+    description: "Read colored manga from PunkRecordz.com",
     contentRating: import_types.ContentRating.EVERYONE,
-    websiteBaseURL: BASE_URL,
+    websiteBaseURL: BASE_URL2,
     sourceTags: [
       { text: "French", type: import_types.BadgeColor.GREY },
       { text: "Colored", type: import_types.BadgeColor.BLUE }
@@ -952,8 +1000,9 @@ var _Sources = (() => {
   var PunkRecordz = class extends import_types.Source {
     constructor() {
       super(...arguments);
-      this.baseUrl = BASE_URL;
-      this.requestManager = createSourceRequestManager(BASE_URL);
+      this.parser = new PunkRecordzParser();
+      this.baseUrl = BASE_URL2;
+      this.requestManager = createSourceRequestManager(BASE_URL2);
       this.catalogCache = null;
       this.catalogPromise = null;
     }
@@ -966,66 +1015,35 @@ var _Sources = (() => {
         this.fetchDocument(`${CATALOG_PATH}/${mangaId}`)
       ]);
       const catalogEntry = catalog.find((entry) => entry.mangaId === mangaId);
-      const title = normalizeTitle($("h2").first().text()) || normalizeTitle($("meta[property='og:title']").attr("content") ?? "") || catalogEntry?.title || mangaId;
-      const description = normalizeWhitespace(
-        $("meta[name='description']").attr("content") ?? ""
-      ) || normalizeWhitespace($("nav[aria-label] p").first().text()) || "";
-      const image = absoluteUrl($("meta[property='og:image']").attr("content") ?? "") || catalogEntry?.image || "";
-      return App.createSourceManga({
-        id: mangaId,
-        mangaInfo: App.createMangaInfo({
-          titles: [title],
-          image,
-          desc: description,
-          status: "Ongoing",
-          hentai: false
-        })
-      });
+      return this.parser.parseMangaDetails($, mangaId, catalogEntry);
     }
     async getChapters(mangaId) {
       const { $ } = await this.fetchDocument(`${CATALOG_PATH}/${mangaId}`);
-      return parseChapterList($, mangaId).map(
-        (chapter) => App.createChapter({
-          id: chapter.chapterId,
-          chapNum: chapter.chapNum,
-          name: chapter.name,
-          langCode: "fr",
-          time: /* @__PURE__ */ new Date(0)
-        })
-      );
+      return this.parser.parseChapterList($, mangaId);
     }
     async getChapterDetails(mangaId, chapterId) {
       const chapterPath = chapterId.startsWith(`${CATALOG_PATH}/`) ? chapterId : `${CATALOG_PATH}/${mangaId}/${chapterId}`;
       const { $ } = await this.fetchDocument(chapterPath);
-      const pages = parseChapterImageUrls($);
-      if (!pages.length) {
-        throw new Error(
-          `PunkRecordz chapter page parsing failed for ${chapterPath}.`
-        );
-      }
-      return App.createChapterDetails({
-        id: chapterId,
-        mangaId,
-        pages
-      });
+      return this.parser.parseChapterDetails($, mangaId, chapterId);
     }
     async getHomePageSections(sectionCallback) {
-      const shellSection = App.createHomeSection({
-        id: HOME_SECTION_ID,
-        title: "Catalog",
-        type: import_types.HomeSectionType.singleRowNormal,
-        containsMoreItems: true
-      });
-      sectionCallback(shellSection);
+      sectionCallback(
+        App.createHomeSection({
+          id: HOME_SECTION_ID,
+          title: "Catalog",
+          type: import_types.HomeSectionType.singleRowNormal,
+          containsMoreItems: true
+        })
+      );
       const catalog = await this.loadCatalog();
-      const populatedSection = App.createHomeSection({
+      const populated = App.createHomeSection({
         id: HOME_SECTION_ID,
         title: "Catalog",
         type: import_types.HomeSectionType.singleRowNormal,
         containsMoreItems: catalog.length > PAGE_SIZE
       });
-      populatedSection.items = catalog.slice(0, PAGE_SIZE).map(toPartialSourceManga);
-      sectionCallback(populatedSection);
+      populated.items = catalog.slice(0, PAGE_SIZE).map((entry) => this.parser.toPartialSourceManga(entry));
+      sectionCallback(populated);
     }
     async getViewMoreItems(homepageSectionId, metadata) {
       if (homepageSectionId !== HOME_SECTION_ID) {
@@ -1033,33 +1051,29 @@ var _Sources = (() => {
       }
       const page = getPageNumber(metadata);
       const catalog = await this.loadCatalog();
-      return createPagedCatalogResults(catalog, page);
+      return this.parser.pagedResults(catalog, page);
     }
     async getSearchResults(searchQuery, metadata) {
       const page = getPageNumber(metadata);
-      const searchTitle = normalizeSearchText(searchQuery.title ?? "");
       const catalog = await this.loadCatalog();
-      const filteredCatalog = !searchTitle ? catalog : catalog.filter(
-        (entry) => normalizeSearchText(`${entry.title} ${entry.mangaId}`).includes(
-          searchTitle
-        )
+      const filtered = this.parser.filterCatalog(
+        catalog,
+        searchQuery.title ?? ""
       );
-      return createPagedCatalogResults(filteredCatalog, page);
+      return this.parser.pagedResults(filtered, page);
     }
     getMangaShareUrl(mangaId) {
       return `${this.baseUrl}/${CATALOG_PATH}/${mangaId}`;
     }
+    // ── Private helpers ──────────────────────────────────────────────────────
     async fetchDocument(path) {
       const response = await this.requestManager.schedule(
-        createGetRequest(absoluteUrl(path)),
+        createGetRequest(`${this.baseUrl}/${path}`),
         1
       );
       throwIfCloudflareBlocked(response.status);
-      const html = coerceString(response.data);
-      return {
-        html,
-        $: this.cheerio.load(html)
-      };
+      const html = typeof response.data === "string" ? response.data : JSON.stringify(response.data);
+      return { html, $: this.cheerio.load(html) };
     }
     async loadCatalog() {
       if (this.catalogCache) return this.catalogCache;
@@ -1074,13 +1088,8 @@ var _Sources = (() => {
     }
     async fetchCatalog() {
       const { html, $ } = await this.fetchDocument(CATALOG_PATH);
-      const mergedCatalog = mergeCatalogEntries(
-        parseCatalogTiles($),
-        parseCatalogPayload(html)
-      );
-      if (mergedCatalog.length > 0) {
-        return mergedCatalog;
-      }
+      const catalog = this.parser.parseCatalog($, html);
+      if (catalog.length > 0) return catalog;
       throw new Error("PunkRecordz catalog parsing failed.");
     }
   };
