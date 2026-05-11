@@ -1,4 +1,5 @@
 import {
+  BadgeColor,
   Chapter,
   ChapterDetails,
   ContentRating,
@@ -37,6 +38,7 @@ export const WeebCentralInfo: SourceInfo = {
   description: "Read manga from WeebCentral.com",
   contentRating: ContentRating.EVERYONE,
   websiteBaseURL: BASE_URL,
+  sourceTags: [{ text: "English", type: BadgeColor.GREY }],
   intents:
     SourceIntents.MANGA_CHAPTERS |
     SourceIntents.HOMEPAGE_SECTIONS |
