@@ -20,6 +20,14 @@ const path = require("path");
 const fs = require("fs");
 const cheerio = require("cheerio");
 
+const CLOUDFLARE_BYPASS_REQUIRED_INTENT = 16;
+const VERSIONING_PATH = path.join(
+  __dirname,
+  "..",
+  "bundles",
+  "versioning.json",
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ANSI colour helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,6 +45,29 @@ const fail = (msg, err) => {
   if (err) console.log(`    ${C.dim(String(err))}`);
 };
 const note = (msg) => console.log(`  ${C.yellow("→")} ${C.dim(msg)}`);
+
+function loadVersioning() {
+  try {
+    if (!fs.existsSync(VERSIONING_PATH)) return { sources: [] };
+    return JSON.parse(fs.readFileSync(VERSIONING_PATH, "utf8"));
+  } catch {
+    return { sources: [] };
+  }
+}
+
+function getSourceMetadata(sourceName) {
+  const versioning = loadVersioning();
+  return (
+    versioning?.sources?.find(
+      (source) => source?.id === sourceName || source?.name === sourceName,
+    ) ?? null
+  );
+}
+
+function isCloudflareBypassError(error) {
+  const message = error?.message ?? String(error ?? "");
+  return message.toLowerCase().includes("cloudflare bypass error");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App global polyfill
@@ -110,8 +141,13 @@ async function testSource(sourceName) {
   if (!fs.existsSync(bundlePath)) {
     console.log(C.red(`  Bundle not found: ${bundlePath}`));
     console.log(C.yellow(`  Run ${C.bold("pnpm run build")} first.`));
-    return { passed: 0, failed: 1 };
+    return { passed: 0, failed: 1, skippedSource: false };
   }
+
+  const sourceMetadata = getSourceMetadata(sourceName);
+  const requiresCloudflareBypass = Boolean(
+    (sourceMetadata?.intents ?? 0) & CLOUDFLARE_BYPASS_REQUIRED_INTENT,
+  );
 
   // Load the bundle — esbuild IIFE exports Sources onto module.exports
   const bundle = require(bundlePath);
@@ -121,7 +157,7 @@ async function testSource(sourceName) {
     console.log(C.red(`  Class "${sourceName}" not found in bundle.Sources`));
     const available = Object.keys(bundle.Sources ?? {}).join(", ");
     console.log(C.yellow(`  Available: ${available || "(none)"}`));
-    return { passed: 0, failed: 1 };
+    return { passed: 0, failed: 1, skippedSource: false };
   }
 
   // Instantiate — Source constructor takes the cheerio namespace
@@ -136,6 +172,12 @@ async function testSource(sourceName) {
   const bad = (msg, err) => {
     fail(msg, err);
     failed++;
+  };
+  const skipRemainingForCloudflare = () => {
+    note(
+      "Cloudflare bypass is required for this source in the current environment — skipping remaining live tests",
+    );
+    return { passed, failed, skippedSource: true };
   };
 
   // ── STEP 1: Home page sections ─────────────────────────────────────────
@@ -159,12 +201,15 @@ async function testSource(sourceName) {
       else ok(`Tile title: "${tile.title}"`);
     }
   } catch (e) {
+    if (requiresCloudflareBypass && isCloudflareBypassError(e)) {
+      return skipRemainingForCloudflare();
+    }
     bad("Threw an error", e.message);
   }
 
   if (!firstMangaId) {
     console.log(C.yellow("\n  No mangaId found — skipping remaining tests"));
-    return { passed, failed };
+    return { passed, failed, skippedSource: false };
   }
 
   // ── STEP 2: Manga details ──────────────────────────────────────────────
@@ -186,6 +231,9 @@ async function testSource(sourceName) {
     if (!desc) bad("No description");
     else ok(`Description: ${desc.length} chars`);
   } catch (e) {
+    if (requiresCloudflareBypass && isCloudflareBypassError(e)) {
+      return skipRemainingForCloudflare();
+    }
     bad("Threw an error", e.message);
   }
 
@@ -210,6 +258,9 @@ async function testSource(sourceName) {
       else ok("All chapters have chapNum");
     }
   } catch (e) {
+    if (requiresCloudflareBypass && isCloudflareBypassError(e)) {
+      return skipRemainingForCloudflare();
+    }
     bad("Threw an error", e.message);
   }
 
@@ -232,6 +283,9 @@ async function testSource(sourceName) {
         else ok("All page URLs are valid http(s) URLs");
       }
     } catch (e) {
+      if (requiresCloudflareBypass && isCloudflareBypassError(e)) {
+        return skipRemainingForCloudflare();
+      }
       bad("Threw an error", e.message);
     }
   } else {
@@ -257,13 +311,16 @@ async function testSource(sourceName) {
         note(`First result: "${items[0]?.title}" (id: ${items[0]?.mangaId})`);
       }
     } catch (e) {
+      if (requiresCloudflareBypass && isCloudflareBypassError(e)) {
+        return skipRemainingForCloudflare();
+      }
       bad("Threw an error", e.message);
     }
   } else {
     note("getSearchResults not implemented — skipped");
   }
 
-  return { passed, failed };
+  return { passed, failed, skippedSource: false };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -291,21 +348,23 @@ async function main() {
 
   let totalPassed = 0;
   let totalFailed = 0;
+  let totalSkippedSources = 0;
 
   for (const name of sources) {
     const bar = "─".repeat(50);
     console.log(C.bold(C.cyan(`\n┌ ${name}`)));
     console.log(C.dim(`│ ${bar}`));
 
-    const { passed, failed } = await testSource(name);
+    const { passed, failed, skippedSource } = await testSource(name);
     totalPassed += passed;
     totalFailed += failed;
+    totalSkippedSources += skippedSource ? 1 : 0;
 
     const colour = failed > 0 ? C.red : C.green;
     console.log(C.dim(`│ ${bar}`));
     console.log(
       C.bold(
-        `└ ${colour(`${passed} passed`)}, ${failed > 0 ? C.red(`${failed} failed`) : C.dim(`${failed} failed`)}`,
+        `└ ${colour(`${passed} passed`)}, ${failed > 0 ? C.red(`${failed} failed`) : C.dim(`${failed} failed`)}${skippedSource ? `, ${C.yellow("source skipped")}` : ""}`,
       ),
     );
   }
@@ -314,7 +373,7 @@ async function main() {
   const colour = totalFailed > 0 ? C.red : C.green;
   console.log(
     C.bold(
-      `  ${colour(`${totalPassed} passed`)}, ${totalFailed > 0 ? C.red(`${totalFailed} failed`) : C.dim(`${totalFailed} failed`)}`,
+      `  ${colour(`${totalPassed} passed`)}, ${totalFailed > 0 ? C.red(`${totalFailed} failed`) : C.dim(`${totalFailed} failed`)}, ${totalSkippedSources > 0 ? C.yellow(`${totalSkippedSources} source(s) skipped`) : C.dim(`${totalSkippedSources} source(s) skipped`)}`,
     ),
   );
   console.log("═".repeat(52) + "\n");
