@@ -3,9 +3,9 @@
 //
 // Usage:
 //   node tests/SourceTester.js                  → test all sources in src/
-//   node tests/SourceTester.js ReadJJKColored   → test one source
+//   node tests/SourceTester.js <sourceName>   → test one source
 //   pnpm test                                    → build then test all
-//   pnpm test -- ReadJJKColored                  → build then test one
+//   pnpm test -- <sourceName>                  → build then test one
 //
 // Node 18+ required (uses built-in fetch).
 //

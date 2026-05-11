@@ -58,26 +58,6 @@ Notes
 - **test**: `pnpm run build && node tests/SourceTester.js`
 - **test:local**: `LOCAL_DEV=1 node tests/SourceTester.js`
 
-<!-- ## Repository layout
-
-```
-.
-├── bundles/                # compiled output (produced by `pnpm run build`)
-├── src/
-│   ├── shared.ts           # shared helpers used by sources
-│   ├── PunkRecordz/
-│   │   ├── PunkRecordz.ts
-│   │   └── PunkRecordzParser.ts
-│   └── ReadJJKColored/
-│       ├── ReadJJKColored.ts
-│       └── ReadJJKColoredParser.ts
-├── templates/              # starter templates (self-contained helpers)
-├── tests/                  # integration/test helpers (e.g. SourceTester.js)
-├── package.json
-├── tsconfig.json
-└── README.md
-``` -->
-
 ## Creating a new extension (recommended workflow)
 
 1. Copy a template from `templates/SingleMangaTemplate` or `templates/MultiMangaTemplate` into `src/YourSource`.

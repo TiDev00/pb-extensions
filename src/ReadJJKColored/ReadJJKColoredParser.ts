@@ -1,13 +1,11 @@
 import {
   Chapter,
   ChapterDetails,
-  PagedResults,
   PartialSourceManga,
   SourceManga,
 } from "@paperback/types";
 
-// Hardcoded fallbacks in case config.js parsing fails.
-// Ensures the extension still works with limited functionality instead of completely breaking.
+// Hardcoded fallbacks in case config.js parsing fails
 const FALLBACK_IMAGE_URL =
   "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk/chapter%201/01_colorized.webp";
 const FALLBACK_BASE_URL =
@@ -43,28 +41,6 @@ export interface SiteConfig {
 // ── Parser class ─────────────────────────────────────────────────────────────
 
 export class ReadJJKColoredParser {
-  /**
-   * Parses the raw config.js text into a typed SiteConfig.
-   *
-   * The real file structure (confirmed from live site):
-   *
-   *   const CHAPTER_PAGE_COUNTS = [58, 26, 23, ...];
-   *
-   *   const MANGA_CONFIG = {
-   *     title: "Jujutsu Kaisen",
-   *     ...
-   *     chapters: CHAPTER_PAGE_COUNTS.map((pageCount, index) => ({
-   *       id: "chapter" + (index + 1),
-   *       folder: "https://.../colorizedjjk/chapter " + (index + 1),
-   *       pageCount,
-   *       coverImage: "01_colorized.webp"
-   *     })),
-   *     fileNaming: { prefix: "", suffix: "_colorized", extension: ".webp" },
-   *   };
-   *
-   * Because chapters is computed via .map(), there are no literal object entries
-   * to regex-parse. Instead we read CHAPTER_PAGE_COUNTS directly.
-   */
   parseConfigJs(raw: string): SiteConfig {
     // ── Page counts ─────────────────────────────────────────────────────────
     // const CHAPTER_PAGE_COUNTS = [ 58, 26, ... ];
@@ -204,7 +180,6 @@ export class ReadJJKColoredParser {
    * Example output:
    *   https://pub-....r2.dev/colorizedjjk/chapter%201/01_colorized.webp
    *   https://pub-....r2.dev/colorizedjjk/chapter%201/02_colorized.webp
-   *   ...
    */
   private buildPageUrls(ch: SiteChapter, cfg: SiteConfig): string[] {
     const folder = this.encodeFolder(ch.folder);
@@ -224,7 +199,7 @@ export class ReadJJKColoredParser {
     return folder.split("/").map(encodeURIComponent).join("/");
   }
 
-  /** Extracts the string value of a JS object key (handles single/double quotes) */
+  /** Extracts the string value (handles single/double quotes) */
   private extractStr(src: string, key: string): string | undefined {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const re = new RegExp(

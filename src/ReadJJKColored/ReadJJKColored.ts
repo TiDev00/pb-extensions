@@ -56,7 +56,7 @@ export class ReadJJKColored extends Source {
   readonly baseUrl = BASE_URL;
   readonly requestManager = createSourceRequestManager(BASE_URL);
 
-  /** In-memory cache — avoids re-fetching config.js on every method call */
+  /** In-memory cache — avoids re-fetching on every method call */
   private _config: SiteConfig | null = null;
 
   async getCloudflareBypassRequestAsync(): Promise<Request> {
