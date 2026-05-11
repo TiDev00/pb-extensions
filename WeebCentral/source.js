@@ -508,14 +508,14 @@ var _Sources = (() => {
       "use strict";
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.BadgeColor = void 0;
-      var BadgeColor;
-      (function(BadgeColor2) {
-        BadgeColor2["BLUE"] = "default";
-        BadgeColor2["GREEN"] = "success";
-        BadgeColor2["GREY"] = "info";
-        BadgeColor2["YELLOW"] = "warning";
-        BadgeColor2["RED"] = "danger";
-      })(BadgeColor = exports.BadgeColor || (exports.BadgeColor = {}));
+      var BadgeColor2;
+      (function(BadgeColor3) {
+        BadgeColor3["BLUE"] = "default";
+        BadgeColor3["GREEN"] = "success";
+        BadgeColor3["GREY"] = "info";
+        BadgeColor3["YELLOW"] = "warning";
+        BadgeColor3["RED"] = "danger";
+      })(BadgeColor2 = exports.BadgeColor || (exports.BadgeColor = {}));
     }
   });
 
@@ -910,6 +910,7 @@ var _Sources = (() => {
     description: "Read manga from WeebCentral.com",
     contentRating: import_types.ContentRating.EVERYONE,
     websiteBaseURL: BASE_URL,
+    sourceTags: [{ text: "English", type: import_types.BadgeColor.GREY }],
     intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS | import_types.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
   };
   var WeebCentral = class extends import_types.Source {
