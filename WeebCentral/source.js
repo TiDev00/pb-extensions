@@ -508,14 +508,14 @@ var _Sources = (() => {
       "use strict";
       Object.defineProperty(exports, "__esModule", { value: true });
       exports.BadgeColor = void 0;
-      var BadgeColor2;
-      (function(BadgeColor3) {
-        BadgeColor3["BLUE"] = "default";
-        BadgeColor3["GREEN"] = "success";
-        BadgeColor3["GREY"] = "info";
-        BadgeColor3["YELLOW"] = "warning";
-        BadgeColor3["RED"] = "danger";
-      })(BadgeColor2 = exports.BadgeColor || (exports.BadgeColor = {}));
+      var BadgeColor;
+      (function(BadgeColor2) {
+        BadgeColor2["BLUE"] = "default";
+        BadgeColor2["GREEN"] = "success";
+        BadgeColor2["GREY"] = "info";
+        BadgeColor2["YELLOW"] = "warning";
+        BadgeColor2["RED"] = "danger";
+      })(BadgeColor = exports.BadgeColor || (exports.BadgeColor = {}));
     }
   });
 
@@ -720,11 +720,11 @@ var _Sources = (() => {
     }
   });
 
-  // src/ReadJJKColored/ReadJJKColored.ts
-  var ReadJJKColored_exports = {};
-  __export(ReadJJKColored_exports, {
-    ReadJJKColored: () => ReadJJKColored,
-    ReadJJKColoredInfo: () => ReadJJKColoredInfo
+  // src/WeebCentral/WeebCentral.ts
+  var WeebCentral_exports = {};
+  __export(WeebCentral_exports, {
+    WeebCentral: () => WeebCentral,
+    WeebCentralInfo: () => WeebCentralInfo
   });
   var import_types = __toESM(require_lib());
 
@@ -763,229 +763,252 @@ var _Sources = (() => {
     }
   }
 
-  // src/ReadJJKColored/ReadJJKColoredParser.ts
-  var FALLBACK_IMAGE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk/chapter%201/01_colorized.webp";
-  var FALLBACK_BASE_URL = "https://pub-64c9aaca3834482ab2167dbf51a3b33b.r2.dev/colorizedjjk";
-  var MANGA_ID = "jjk-colored";
-  var ReadJJKColoredParser = class {
-    parseConfigJs(raw) {
-      const countsBlock = raw.match(
-        /const\s+CHAPTER_PAGE_COUNTS\s*=\s*\[([\s\S]*?)\]/
-      );
-      const pageCounts = countsBlock ? (countsBlock[1].match(/\d+/g) ?? []).map(Number) : [];
-      const baseMatch = raw.match(
-        /folder:\s*["'](https:\/\/[^"']+?)\/chapter\s*["']/
-      );
-      const imageBaseUrl = baseMatch?.[1] ?? FALLBACK_BASE_URL;
-      const filePrefix = this.extractStr(raw, "prefix") ?? "";
-      const fileSuffix = this.extractStr(raw, "suffix") ?? "_colorized";
-      const fileExtension = this.extractStr(raw, "extension") ?? ".webp";
-      const title = this.extractStr(raw, "title") ?? "Jujutsu Kaisen";
-      const description = this.extractStr(raw, "description") ?? "";
-      const author = this.extractStr(raw, "author") ?? "Gege Akutami";
-      const chapters = pageCounts.map((pageCount, index) => ({
-        id: `chapter${index + 1}`,
-        title: `Chapter ${index + 1}`,
-        folder: `chapter ${index + 1}`,
-        // relative — passed to encodeFolder()
-        pageCount,
-        releaseDate: "",
-        coverImage: `01_colorized${fileExtension}`,
-        chapNum: index + 1,
-        volume: void 0
-      })).filter((ch) => ch.pageCount > 0);
-      chapters.sort((a, b) => b.chapNum - a.chapNum);
-      const ch1 = chapters[chapters.length - 1];
-      const coverImageUrl = ch1 ? `${imageBaseUrl}/${this.encodeFolder(ch1.folder)}/01_colorized${fileExtension}` : FALLBACK_IMAGE_URL;
-      return {
-        title,
-        description,
-        author,
-        coverImageUrl,
-        imageBaseUrl,
-        filePrefix,
-        fileSuffix,
-        fileExtension,
-        chapters
-      };
+  // src/WeebCentral/WeebCentralParser.ts
+  var COVER_BASE = "https://temp.compsci88.com/cover/fallback";
+  var WeebCentralParser = class {
+    parseHomeSections($) {
+      const seen = /* @__PURE__ */ new Set();
+      const results = [];
+      $("article[data-tip]").each((_, el) => {
+        const seriesAnchor = $(el).find("a[href*='/series/']").first();
+        if (!seriesAnchor.length) return;
+        const href = seriesAnchor.attr("href") ?? "";
+        const mangaId = this.extractMangaId(href);
+        if (!mangaId) return;
+        const seriesId = mangaId.split("/")[0];
+        if (seen.has(seriesId)) return;
+        seen.add(seriesId);
+        const title = ($(el).attr("data-tip") ?? "").trim();
+        const image = `${COVER_BASE}/${seriesId}.jpg`;
+        results.push(App.createPartialSourceManga({ mangaId, title, image }));
+      });
+      return results;
     }
-    parseMangaDetails(cfg) {
+    parseMangaDetails($, mangaId) {
+      const seriesId = mangaId.split("/")[0];
+      const title = $("h1").first().text().trim();
+      const image = `${COVER_BASE}/${seriesId}.jpg`;
+      const desc = $("p.whitespace-pre-wrap").first().text().trim();
+      let author = "";
+      let status = "";
+      const tagLabels = [];
+      $("ul li").each((_, li) => {
+        const strongText = $(li).find("strong").first().text();
+        if (strongText.includes("Author")) {
+          author = $(li).find("a").first().text().trim();
+        } else if (strongText.includes("Status")) {
+          status = $(li).find("a").first().text().trim();
+        } else if (strongText.includes("Tag")) {
+          $(li).find("a").each((__, a) => {
+            const tag = $(a).text().trim();
+            if (tag) tagLabels.push(tag);
+          });
+        }
+      });
       return App.createSourceManga({
-        id: MANGA_ID,
+        id: mangaId,
         mangaInfo: App.createMangaInfo({
-          titles: [cfg.title],
-          image: cfg.coverImageUrl,
-          author: cfg.author,
-          artist: cfg.author,
-          desc: cfg.description,
-          status: "Ongoing",
+          titles: [title],
+          image,
+          author,
+          desc,
+          status,
           hentai: false,
-          tags: [
+          tags: tagLabels.length ? [
             App.createTagSection({
               id: "genres",
               label: "Genres",
-              tags: [
-                App.createTag({ id: "action", label: "Action" }),
-                App.createTag({ id: "colored", label: "Colored" }),
-                App.createTag({ id: "shounen", label: "Shounen" }),
-                App.createTag({ id: "supernatural", label: "Supernatural" })
-              ]
+              tags: tagLabels.map(
+                (label) => App.createTag({
+                  id: label.toLowerCase().replace(/\s+/g, "-"),
+                  label
+                })
+              )
             })
-          ]
+          ] : []
         })
       });
     }
-    parseChapterList(cfg) {
-      return cfg.chapters.map(
-        (ch) => App.createChapter({
-          id: ch.id,
-          chapNum: ch.chapNum,
-          name: ch.title,
-          langCode: "en",
-          volume: ch.volume,
-          time: ch.releaseDate ? new Date(ch.releaseDate) : /* @__PURE__ */ new Date()
-        })
-      );
+    parseChapterList($, _mangaId) {
+      const chapters = [];
+      const seen = /* @__PURE__ */ new Set();
+      $("a[href*='/chapters/']").each((_, el) => {
+        const href = $(el).attr("href") ?? "";
+        const chapterId = href.split("/chapters/")[1]?.split("?")[0]?.trim();
+        if (!chapterId || seen.has(chapterId)) return;
+        seen.add(chapterId);
+        const titleText = $(el).find("span.grow span").first().text().trim();
+        const numMatch = titleText.match(/(\d+(?:\.\d+)?)/);
+        const chapNum = numMatch ? parseFloat(numMatch[1]) : 0;
+        const datetimeAttr = $(el).find("time").attr("datetime");
+        const time = datetimeAttr ? new Date(datetimeAttr) : void 0;
+        chapters.push(
+          App.createChapter({
+            id: chapterId,
+            chapNum,
+            name: titleText || `Chapter ${chapNum}`,
+            langCode: "en",
+            time
+          })
+        );
+      });
+      return chapters;
     }
-    parseChapterDetails(cfg, chapId) {
-      const ch = cfg.chapters.find((c) => c.id === chapId);
-      const pages = ch ? this.buildPageUrls(ch, cfg) : [];
-      return App.createChapterDetails({ id: chapId, mangaId: MANGA_ID, pages });
-    }
-    parseHomeItems(cfg) {
-      const latest = cfg.chapters[0];
-      return [
-        App.createPartialSourceManga({
-          mangaId: MANGA_ID,
-          image: cfg.coverImageUrl,
-          title: cfg.title,
-          subtitle: latest?.title ?? ""
-        })
-      ];
-    }
-    matchesSearchQuery(query) {
-      const q = query.toLowerCase();
-      if (!q) return true;
-      const keywords = ["jujutsu", "kaisen", "jjk", "colored", "colour", "color"];
-      return keywords.some((k) => q.includes(k));
-    }
-    // ── Private helpers ──────────────────────────────────────────────────────
-    /**
-     * Generates ordered page image URLs for one chapter.
-     *
-     * Pattern from static HTML:
-     *   {imageBaseUrl}/{folder}/{prefix}{NN}{suffix}{extension}
-     *
-     * Example output:
-     *   https://pub-....r2.dev/colorizedjjk/chapter%201/01_colorized.webp
-     *   https://pub-....r2.dev/colorizedjjk/chapter%201/02_colorized.webp
-     */
-    buildPageUrls(ch, cfg) {
-      const folder = this.encodeFolder(ch.folder);
+    parseChapterDetails($, mangaId, chapterId) {
       const pages = [];
-      for (let i = 1; i <= ch.pageCount; i++) {
-        const nn = String(i).padStart(2, "0");
-        const filename = `${cfg.filePrefix}${nn}${cfg.fileSuffix}${cfg.fileExtension}`;
-        pages.push(`${cfg.imageBaseUrl}/${folder}/${filename}`);
+      $("img").each((_, el) => {
+        const src = $(el).attr("src") ?? "";
+        const cls = $(el).attr("class") ?? "";
+        if (cls.includes("maw-w-full") && src.startsWith("http")) {
+          pages.push(src);
+        }
+      });
+      if (!pages.length) {
+        throw new Error(
+          `WeebCentral: no pages found for chapter "${chapterId}".`
+        );
       }
-      return pages;
+      return App.createChapterDetails({ id: chapterId, mangaId, pages });
     }
-    /** URL-encodes each path segment while preserving forward slashes */
-    encodeFolder(folder) {
-      return folder.split("/").map(encodeURIComponent).join("/");
+    parseSearchResults($) {
+      return this.parseHomeSections($);
     }
-    /** Extracts the string value (handles single/double quotes) */
-    extractStr(src, key) {
-      const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const re = new RegExp(
-        `["']?${escapedKey}["']?\\s*:\\s*["']([^"'\\r\\n]+)["']`
-      );
-      return src.match(re)?.[1]?.trim();
+    parseSimpleSearch($) {
+      const results = [];
+      const seen = /* @__PURE__ */ new Set();
+      $("a[href*='/series/']").each((_, el) => {
+        const href = $(el).attr("href") ?? "";
+        const mangaId = this.extractMangaId(href);
+        if (!mangaId) return;
+        const seriesId = mangaId.split("/")[0];
+        if (seen.has(seriesId)) return;
+        seen.add(seriesId);
+        const imgAlt = $(el).find("img").first().attr("alt") ?? "";
+        const title = imgAlt.replace(/\s*cover$/i, "").trim() || (mangaId.split("/").pop()?.replace(/-/g, " ") ?? "");
+        const image = `${COVER_BASE}/${seriesId}.jpg`;
+        results.push(App.createPartialSourceManga({ mangaId, title, image }));
+      });
+      return results;
+    }
+    pagedResults(items) {
+      return App.createPagedResults({ results: items });
+    }
+    // ── Private helpers ────────────────────────────────────────────────────────
+    extractMangaId(href) {
+      const match = href.match(/\/series\/([^?#\s]+)/);
+      return match ? match[1] : null;
     }
   };
 
-  // src/ReadJJKColored/ReadJJKColored.ts
-  var BASE_URL = "https://readjjkcolored.com";
-  var CONFIG_URL = `${BASE_URL}/config.js`;
-  var ReadJJKColoredInfo = {
+  // src/WeebCentral/WeebCentral.ts
+  var BASE_URL = "https://weebcentral.com";
+  var WeebCentralInfo = {
     version: "1.0.0",
-    name: "ReadJJKColored",
+    name: "WeebCentral",
     icon: "icon.png",
     author: "TiDev00",
-    description: "Read Jujutsu Kaisen in full AI-colorized HD from readjjkcolored.com",
+    description: "Read manga from WeebCentral.com",
     contentRating: import_types.ContentRating.EVERYONE,
     websiteBaseURL: BASE_URL,
-    sourceTags: [
-      { text: "English", type: import_types.BadgeColor.GREY },
-      { text: "Colored", type: import_types.BadgeColor.BLUE }
-    ],
     intents: import_types.SourceIntents.MANGA_CHAPTERS | import_types.SourceIntents.HOMEPAGE_SECTIONS | import_types.SourceIntents.CLOUDFLARE_BYPASS_REQUIRED
   };
-  var ReadJJKColored = class extends import_types.Source {
+  var WeebCentral = class extends import_types.Source {
     constructor() {
       super(...arguments);
-      this.parser = new ReadJJKColoredParser();
+      this.parser = new WeebCentralParser();
       this.baseUrl = BASE_URL;
       this.requestManager = createSourceRequestManager(BASE_URL);
-      /** In-memory cache — avoids re-fetching on every method call */
-      this._config = null;
     }
     async getCloudflareBypassRequestAsync() {
       return createCloudflareBypassRequest(this.baseUrl);
     }
-    async getMangaDetails(_mangaId) {
-      const cfg = await this.loadConfig();
-      return this.parser.parseMangaDetails(cfg);
+    async getMangaDetails(mangaId) {
+      const { $ } = await this.fetchDocument(`/series/${mangaId}`);
+      return this.parser.parseMangaDetails($, mangaId);
     }
-    async getChapters(_mangaId) {
-      const cfg = await this.loadConfig();
-      return this.parser.parseChapterList(cfg);
+    async getChapters(mangaId) {
+      const seriesId = mangaId.split("/")[0];
+      const { $ } = await this.fetchDocument(
+        `/series/${seriesId}/full-chapter-list`
+      );
+      return this.parser.parseChapterList($, mangaId);
     }
-    async getChapterDetails(_mangaId, chapId) {
-      const cfg = await this.loadConfig();
-      return this.parser.parseChapterDetails(cfg, chapId);
+    async getChapterDetails(mangaId, chapterId) {
+      const { $ } = await this.fetchDocument(
+        `/chapters/${chapterId}/images?reading_style=long_strip`,
+        { "HX-Request": "true" }
+      );
+      return this.parser.parseChapterDetails($, mangaId, chapterId);
     }
     async getHomePageSections(sectionCallback) {
       sectionCallback(
         App.createHomeSection({
-          id: "jjk_colored",
-          title: "Jujutsu Kaisen \u2013 Colored",
+          id: "latest",
+          title: "Latest Updates",
           type: import_types.HomeSectionType.singleRowNormal,
           containsMoreItems: false
         })
       );
-      const cfg = await this.loadConfig();
+      const { $ } = await this.fetchDocument("/");
+      const items = this.parser.parseHomeSections($);
       const populated = App.createHomeSection({
-        id: "jjk_colored",
-        title: "Jujutsu Kaisen \u2013 Colored",
+        id: "latest",
+        title: "Latest Updates",
         type: import_types.HomeSectionType.singleRowNormal,
         containsMoreItems: false
       });
-      populated.items = this.parser.parseHomeItems(cfg);
+      populated.items = items;
       sectionCallback(populated);
     }
-    async getSearchResults(query, _metadata) {
-      if (!this.parser.matchesSearchQuery(query.title ?? "")) {
-        return App.createPagedResults({ results: [] });
+    async getSearchResults(searchQuery, _metadata) {
+      const query = (searchQuery.title ?? "").trim();
+      if (!query) {
+        const { $: $2 } = await this.fetchDocument("/");
+        return App.createPagedResults({
+          results: this.parser.parseHomeSections($2)
+        });
       }
-      const cfg = await this.loadConfig();
-      return App.createPagedResults({ results: this.parser.parseHomeItems(cfg) });
+      const { $ } = await this.postDocument(
+        "/search/simple?location=main",
+        `text=${encodeURIComponent(query)}`,
+        { "HX-Request": "true" }
+      );
+      return App.createPagedResults({
+        results: this.parser.parseSimpleSearch($)
+      });
     }
     getMangaShareUrl(mangaId) {
-      return `${this.baseUrl}/?manga=${mangaId}`;
+      return `${this.baseUrl}/series/${mangaId}`;
     }
     // ── Private helpers ──────────────────────────────────────────────────────
-    async loadConfig() {
-      if (this._config) return this._config;
-      const response = await this.requestManager.schedule(
-        createGetRequest(CONFIG_URL),
-        1
-      );
+    async fetchDocument(path, extraHeaders = {}) {
+      const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+      const request = createGetRequest(url);
+      if (Object.keys(extraHeaders).length) {
+        request.headers = { ...request.headers ?? {}, ...extraHeaders };
+      }
+      const response = await this.requestManager.schedule(request, 1);
       throwIfCloudflareBlocked(response.status);
-      this._config = this.parser.parseConfigJs(response.data);
-      return this._config;
+      const html = typeof response.data === "string" ? response.data : JSON.stringify(response.data);
+      return { $: this.cheerio.load(html) };
+    }
+    async postDocument(path, body, extraHeaders = {}) {
+      const url = path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+      const request = App.createRequest({
+        url,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          ...extraHeaders
+        },
+        data: body
+      });
+      const response = await this.requestManager.schedule(request, 1);
+      throwIfCloudflareBlocked(response.status);
+      const html = typeof response.data === "string" ? response.data : JSON.stringify(response.data);
+      return { $: this.cheerio.load(html) };
     }
   };
-  return __toCommonJS(ReadJJKColored_exports);
+  return __toCommonJS(WeebCentral_exports);
 })();
 this.Sources = _Sources; if (typeof exports === 'object' && typeof module !== 'undefined') {module.exports.Sources = this.Sources;}
